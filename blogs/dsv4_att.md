@@ -1,3 +1,8 @@
+---
+layout: default
+title: DeepSeek-V4 注意力机制深度解析
+---
+
 # DeepSeek-V4 注意力机制深度解析
 
 > 从标准 Attention 到 MLA、DSA、CSA/HCA 的完整演化路径
