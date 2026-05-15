@@ -1,5 +1,4 @@
 ---
-layout: default
 title: DeepSeek-V4 注意力机制深度解析
 ---
 
