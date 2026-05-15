@@ -26,6 +26,13 @@
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('pre code[class*="language-mermaid"]').forEach(function(block) {
+        var pre = block.parentElement;
+        var div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = block.textContent;
+        pre.replaceWith(div);
+      });
       mermaid.initialize({ startOnLoad: true, theme: 'default' });
     });
   </script>
