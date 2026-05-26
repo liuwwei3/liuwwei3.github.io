@@ -166,7 +166,9 @@ def resolve_and_copy(
             dest_rel = f"figures/{basename}" if typ == 'image' else basename
 
             if dest.exists():
-                skipped.append(dest_rel)
+                if key not in skipped_set:
+                    skipped.append(dest_rel)
+                    skipped_set.add(key)
                 visited.add(key)
                 # still recurse into md files even if skipped
                 if typ == 'md':
