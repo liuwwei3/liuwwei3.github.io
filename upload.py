@@ -328,6 +328,7 @@ def main():
     parser = argparse.ArgumentParser(description='Upload a markdown article to the blog.')
     parser.add_argument('source', help='Path to source .md file')
     parser.add_argument('--title', help='Override auto-detected title', default=None)
+    parser.add_argument('--slug', help='Override output filename (without .md)', default=None)
     parser.add_argument('--dry-run', action='store_true', help='Simulate without writing/git')
     args = parser.parse_args()
 
@@ -355,7 +356,10 @@ def main():
         sys.exit(1)
 
     # Determine output filename
-    filename = slugify(title, source)
+    if args.slug:
+        filename = args.slug + '.md'
+    else:
+        filename = slugify(title, source)
     dest_path = BLOGS_DIR / filename
 
     if dest_path.exists() and not args.dry_run:
