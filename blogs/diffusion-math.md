@@ -137,14 +137,14 @@ $$
 
 重参数化技巧是深度学习中使用随机变量的标准方法。核心思想：将**带参数的随机性**拆分为**确定性变换 + 无参数噪声**。
 
-
 **示例**：抽样 $\mathbf{x} \sim \mathcal{N}(\boldsymbol{\mu}_{\theta}, \sigma_{\theta}^2\mathbf{I})$ 等价于：
 
 $$\mathbf{x} = \boldsymbol{\mu}_\theta + \sigma_\theta \cdot \boldsymbol{\epsilon}, \quad \boldsymbol{\epsilon} \sim \mathcal{N}(0,\mathbf{I})$$
 
-$\boldsymbol{\epsilon}$ 不依赖参数 $\theta$，因此梯度可以穿过 $\boldsymbol{\mu}_\theta$ 和 $\sigma_\theta$ 反向传播。
+$\boldsymbol{\epsilon}$ 不依赖参数 $\theta$。
+因此梯度可以穿过 $\boldsymbol{\mu}_\theta$ 和 $\sigma_\theta$ 反向传播。
 
-在扩散模型中，前向过程 $\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon}$ 就是重参数化的一次应用：这使得 $\mathbf{x}_t$ 可以在一步中直接从 $\mathbf{x}_0$ 采样，无需模拟 $t$ 步链。
+在扩散模型中，前向过程 $\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon}$ 就是重参数化的一次应用：使得 $\mathbf{x}_t$ 可以在一步中直接从 $\mathbf{x}_0$ 采样，无需模拟 $t$ 步链。
 
 ### 0.4 得分函数 (Score Function)
 
@@ -786,8 +786,5 @@ $$f_\theta(\mathbf{x}_T, T) \to \mathbf{x}_0 \quad \text{(一步生成)}$$
 | ODE / PF-ODE / Euler 求解 | 第二、五章 | 0.8 |
 | Push-forward / 变量替换 | 第六、七章 | 0.9 |
 | 期望 / L2 范数 | 全文 | 0.10 |
-
-
-
 
 [← 回到首页](..)
