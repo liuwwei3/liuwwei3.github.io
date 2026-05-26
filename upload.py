@@ -89,18 +89,6 @@ def extract_refs(text: str) -> list[tuple[str, str]]:
     return refs
 
 
-def refs_in_dir(refs: list[tuple[str, str]]) -> list[tuple[str, str]]:
-    """Deduplicate refs by basename, keeping first occurrence."""
-    seen = set()
-    result = []
-    for path, typ in refs:
-        key = (os.path.basename(path), typ)
-        if key not in seen:
-            seen.add(key)
-            result.append((path, typ))
-    return result
-
-
 # ── core operations ──
 
 def check_git_clean(repo: Path) -> tuple[bool, str]:
@@ -187,7 +175,7 @@ def resolve_and_copy(
     return {'copied': copied, 'skipped': skipped, 'missing': missing}
 
 
-def rewrite_paths(content: str, source_dir: str) -> str:
+def rewrite_paths(content: str) -> str:
     """Rewrite local reference paths for blog directory structure."""
     def replace_image(match):
         alt, path = match.group(1), match.group(2)
@@ -341,8 +329,6 @@ def main():
         print(json.dumps({"status": "error", "message": f"Source not found: {source}"}))
         sys.exit(1)
 
-    source_dir = os.path.dirname(source)
-
     # Read source
     with open(source, encoding='utf-8') as f:
         raw = f.read()
@@ -376,7 +362,7 @@ def main():
     ref_result = resolve_and_copy(source, BLOGS_DIR, FIGURES_DIR, args.dry_run)
 
     # Rewrite paths in article content
-    article_body = rewrite_paths(raw, source_dir)
+    article_body = rewrite_paths(raw)
 
     # Build final article
     article = build_article(article_body, title)
