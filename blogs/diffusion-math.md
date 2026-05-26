@@ -5,6 +5,7 @@ title: Diffusion 模型的数学主线：从马尔可夫链到概率流
 # Diffusion 模型的数学主线：从马尔可夫链到概率流
 [← 回到首页](..)
 
+
 > 本文梳理 2015–2025 年间 34 篇 Diffusion 核心论文的数学框架，找到一条贯穿始终的数学主线。
 >
 > **目标读者**：已学习概率论基础（随机变量、期望、高斯分布）的学生。第零章补充了理解扩散模型所需的所有进阶数学知识。
@@ -129,7 +130,7 @@ $$
 > **几何直觉**：当两个高斯的协方差相同时，KL 散度退化为**均值之间的欧几里得距离平方**
 > （除以 $2\sigma^2$）。这意味着最小化 KL 等价于让模型的均值 $\boldsymbol{\mu}_p$ 尽可能接近
 > 真实均值 $\boldsymbol{\mu}_q$——这正是 MSE 回归。当协方差不同时，KL 散度还惩罚方向性
-> 的不匹配（通过 $\log\frac{|\Sigma_p|}{|\Sigma_q|}$ 和 $\text{tr}(\Sigma_p^{-1}\Sigma_q)$ 项）。
+> 的不匹配（通过 $\log\frac{\lvert\Sigma_p\rvert}{\lvert\Sigma_q\rvert}$ 和 $\text{tr}(\Sigma_p^{-1}\Sigma_q)$ 项）。
 > 详见第四章的 [fig-kl-geometry.png] 分析。
 
 ### 0.3 重参数化技巧
@@ -158,7 +159,7 @@ $$\nabla_{\mathbf{x}}\log p(\mathbf{x}) = \nabla_{\mathbf{x}}\log\tilde{p}(\math
 
 这是"去噪得分匹配"可行的数学基础——我们不需要知道 $p_t(\mathbf{x})$ 的归一化常数也能估计其得分函数。
 
-**高斯条件分布的得分**：对于 $\mathbf{x}_t|\mathbf{x}_0 \sim \mathcal{N}(\alpha_t\mathbf{x}_0, \sigma_t^2\mathbf{I})$：
+**高斯条件分布的得分**：对于 $\mathbf{x}_t\mid\mathbf{x}_0 \sim \mathcal{N}(\alpha_t\mathbf{x}_0, \sigma_t^2\mathbf{I})$：
 
 $$\nabla_{\mathbf{x}_t}\log q(\mathbf{x}_t|\mathbf{x}_0) = -\frac{\mathbf{x}_t - \alpha_t\mathbf{x}_0}{\sigma_t^2} = -\frac{\boldsymbol{\epsilon}}{\sigma_t}$$
 
@@ -177,11 +178,11 @@ $$\nabla_{\mathbf{x}_t}\log q(\mathbf{x}_t|\mathbf{x}_0) = -\frac{\mathbf{x}_t -
 
 $$\log p_\theta(\mathbf{x}) \geq \mathbb{E}_{q(\mathbf{z}|\mathbf{x})}\left[\log\frac{p_\theta(\mathbf{x},\mathbf{z})}{q(\mathbf{z}|\mathbf{x})}\right] =: \text{ELBO}$$
 
-**间隙**：$\log p_\theta(\mathbf{x}) - \text{ELBO} = D_{\text{KL}}(q(\mathbf{z}|\mathbf{x}) \| p_\theta(\mathbf{z}|\mathbf{x})) \geq 0$.
+**间隙**：$\log p_\theta(\mathbf{x}) - \text{ELBO} = D_{\text{KL}}(q(\mathbf{z}\mid\mathbf{x}) \| p_\theta(\mathbf{z}\mid\mathbf{x})) \geq 0$.
 
 在扩散模型中：
 - $\mathbf{z} = \mathbf{x}_{1:T}$ 是隐变量序列
-- $q(\mathbf{z}|\mathbf{x}) = q(\mathbf{x}_{1:T}|\mathbf{x}_0)$ 是固定的前向过程（不需要学习）
+- $q(\mathbf{z}\mid\mathbf{x}) = q(\mathbf{x}_{1:T}\mid\mathbf{x}_0)$ 是固定的前向过程（不需要学习）
 - $p_\theta(\mathbf{x},\mathbf{z}) = p_\theta(\mathbf{x}_{0:T})$ 是学习的逆向过程
 
 训练目标就是最大化 ELBO。
@@ -200,7 +201,7 @@ $$p(\mathbf{x}_t | \mathbf{x}_{t-1}, \mathbf{x}_{t-2}, \ldots, \mathbf{x}_0) = p
 
 即未来状态只依赖于当前状态，与历史无关。
 
-**转移核**：$p(\mathbf{x}_t | \mathbf{x}_{t-1})$ 完全描述了一个马尔可夫链的动力学。
+**转移核**：$p(\mathbf{x}_t \mid \mathbf{x}_{t-1})$ 完全描述了一个马尔可夫链的动力学。
 
 **扩散模型**：前向过程是人为设计的马尔可夫链（每步加高斯噪声），逆向过程是神经网络学习的另一个马尔可夫链（每步去噪）。
 
@@ -310,7 +311,7 @@ $$p_{\mathbf{x}}(\mathbf{x}) = p_{\mathbf{z}}(\phi^{-1}(\mathbf{x}))\left|\det\f
 
 **左上→右上**：500 个高斯噪声点（$\mathbf{z} \sim \mathcal{N}(0,\mathbf{I})$）经过仿射变换 $\phi(\mathbf{z}) = \mathbf{W}\mathbf{z} + \mathbf{b}$ 后，云团被拉伸、旋转和平移。每个灰线连接了变换前后的对应点。
 
-**左下（密度变化）**：当 $x = e^z$ 将高斯压缩时，密度也发生变化——$p(x)$ 不再是高斯，而是对数正态分布。Push-forward 公式 $p_x(x) = p_z(\phi^{-1}(x))|\det \partial\phi^{-1}/\partial x|$ 中的 Jacobian 因子精确地补偿了这种体积变化。
+**左下（密度变化）**：当 $x = e^z$ 将高斯压缩时，密度也发生变化——$p(x)$ 不再是高斯，而是对数正态分布。Push-forward 公式 $p_x(x) = p_z(\phi^{-1}(x))\,\lvert\det \partial\phi^{-1}\!/\partial x\rvert$ 中的 Jacobian 因子精确地补偿了这种体积变化。
 
 **右下（体积缩放）**：雅可比矩阵 $\mathbf{J} = \partial\phi/\partial\mathbf{z}$ 的行列式 $\det(\mathbf{J})$ 度量了变换 $\phi$ 对小体积元的放大倍数。蓝色正方形被拉伸为红色平行四边形，面积放大了 $\det(\mathbf{J}) = 1.56$ 倍。
 
@@ -365,7 +366,7 @@ $$q(\mathbf{x}_t|\mathbf{x}_{t-1}) = \mathcal{N}\left(\mathbf{x}_t; \sqrt{1-\bet
 
 其中 $0 < \beta_1 < \cdots < \beta_T < 1$ 是噪声调度。
 
-**关键性质**：当 $\beta_t$ 足够小，逆向条件分布 $q(\mathbf{x}_{t-1}|\mathbf{x}_t)$ 也是高斯的（尽管显式形式需要 $\mathbf{x}_0$）——这来自 §0.1 中高斯条件分布的封闭性。
+**关键性质**：当 $\beta_t$ 足够小，逆向条件分布 $q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)$ 也是高斯的（尽管显式形式需要 $\mathbf{x}_0$）——这来自 §0.1 中高斯条件分布的封闭性。
 
 定义一个参数化的**逆向马尔可夫链**：
 
@@ -421,7 +422,7 @@ $$\nabla_{\mathbf{x}_t}\log q(\mathbf{x}_t|\mathbf{x}_0) = -\frac{\boldsymbol{\e
 
 ### 2.1 打破马尔可夫锁链 (DDIM, Song et al., 2021)
 
-DDIM 的关键观察：**DDPM 的损失只依赖于边缘分布 $q(\mathbf{x}_t|\mathbf{x}_0)$，不依赖于联合分布的具体形式**。
+DDIM 的关键观察：**DDPM 的损失只依赖于边缘分布 $q(\mathbf{x}_t\mid\mathbf{x}_0)$，不依赖于联合分布的具体形式**。
 
 构建一族**非马尔可夫**前向过程，参数化为 $\sigma \in \mathbb{R}_{\geq 0}^T$：
 
@@ -538,7 +539,7 @@ $$\hat{\boldsymbol{\epsilon}}_\theta(\mathbf{x}_t, y) = \boldsymbol{\epsilon}_\t
 
 ### 4.2 Classifier-Free Guidance (Ho & Salimans, 2021)
 
-不显式需要 $p(y|\mathbf{x})$。训练时以概率 $p_{\text{uncond}}$ 丢弃条件：
+不显式需要 $p(y\mid\mathbf{x})$。训练时以概率 $p_{\text{uncond}}$ 丢弃条件：
 
 $$\tilde{\boldsymbol{\epsilon}}_\theta(\mathbf{x}, c) = (1+w)\boldsymbol{\epsilon}_\theta(\mathbf{x}, c) - w\,\boldsymbol{\epsilon}_\theta(\mathbf{x}, \varnothing)$$
 
