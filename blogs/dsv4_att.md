@@ -3,7 +3,7 @@ layout: default
 title: DeepSeek-V4 注意力机制深度解析
 ---
 # DeepSeek-V4 注意力机制深度解析
-[← 回到首页](../README)
+[← 回到首页](..)
 
 > 从标准 Attention 到 MLA、DSA、CSA/HCA 的完整演化路径
 
@@ -1308,4 +1308,4 @@ graph TB
 > - DeepSeek-AI, "DeepSeek-V4: Towards Highly Efficient Million-Token Context Intelligence", 2026
 > - Xie et al., "Manifold-Constrained Hyper-Connections", 2026
 
-[← 回到首页](../README)
+[← 回到首页](..)

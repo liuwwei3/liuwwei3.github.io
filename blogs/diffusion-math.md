@@ -2,7 +2,7 @@
 layout: default
 title: Diffusion 模型的数学主线：从马尔可夫链到概率流
 ---
-[← 回到首页](../README)
+[← 回到首页](..)
 
 # Diffusion 模型的数学主线：从马尔可夫链到概率流
 
@@ -759,4 +759,4 @@ $$f_\theta(\mathbf{x}_T, T) \to \mathbf{x}_0 \quad \text{(一步生成)}$$
 | Push-forward / 变量替换 | 第六、七章 | 0.9 |
 | 期望 / L2 范数 | 全文 | 0.10 |
 
-[← 回到首页](../README)
+[← 回到首页](..)
