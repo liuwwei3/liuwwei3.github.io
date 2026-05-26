@@ -123,13 +123,13 @@ def resolve_and_copy(
     Returns {'copied': [...], 'skipped': [...], 'missing': [...]}.
     """
     copied, skipped, missing = [], [], []
-    visited: set[str] = set()  # set of destination basenames already present
-    queue: list[tuple[str, str]] = [(source_file, os.path.basename(source_file))]  # (src_abs, dest_basename)
+    visited: set[str] = set()
+    skipped_set: set[str] = set()
+    queue: list[tuple[str, str]] = [(source_file, os.path.basename(source_file))]
 
     while queue:
         current_src, _ = queue.pop(0)
 
-        # read current file
         try:
             with open(current_src, encoding='utf-8') as f:
                 content = f.read()
@@ -145,8 +145,9 @@ def resolve_and_copy(
             key = f"{basename}:{typ}"
 
             if key in visited:
-                if key not in [f"{s}:{t}" for s, t, _ in [(c, 'image', '') for c in copied] + [(c, 'md', '') for c in copied]]:
+                if key not in skipped_set:
                     skipped.append(basename)
+                    skipped_set.add(key)
                 continue
 
             # resolve absolute path
