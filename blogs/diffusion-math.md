@@ -57,7 +57,7 @@ title: Diffusion 模型的数学主线：从马尔可夫链到概率流
 | 符号 | 含义 | 首次出现 |
 |------|------|---------|
 | $\mathcal{L}_{\text{simple}}$ | DDPM 简化噪声预测损失 | §1.2 |
-| $D_{\text{KL}}(q \| p)$ | KL 散度 | §0.2 |
+| $D_{\text{KL}}(q \Vert p)$ | KL 散度 | §0.2 |
 | $\mathbb{E}_{q}[\,\cdot\,]$ | 在分布 $q$ 下的期望 | §1.1 |
 | $\theta$ | 神经网络参数 | §1.1 |
 | $\mathcal{N}(\mathbf{x}; \boldsymbol{\mu}, \boldsymbol{\Sigma})$ | 均值为 $\boldsymbol{\mu}$、协方差为 $\boldsymbol{\Sigma}$ 的高斯分布 | §0.1 |
@@ -89,7 +89,7 @@ $$p(\mathbf{x}) = \frac{1}{(2\pi)^{d/2}|\boldsymbol{\Sigma}|^{1/2}}\exp\!\left(-
 
 $$\mathcal{N}(\boldsymbol{\mu}, \sigma^2\mathbf{I}) = \boldsymbol{\mu} + \sigma \cdot \mathcal{N}(0,\mathbf{I})$$
 
-即每个维度独立同分布，方差相同。它的密度函数简化为 $p(\mathbf{x}) = \frac{1}{(2\pi\sigma^2)^{d/2}}\exp(-\frac{\|\mathbf{x}-\boldsymbol{\mu}\|^2}{2\sigma^2})$.
+即每个维度独立同分布，方差相同。它的密度函数简化为 $p(\mathbf{x}) = \frac{1}{(2\pi\sigma^2)^{d/2}}\exp(-\frac{\Vert\mathbf{x}-\boldsymbol{\mu}\Vert^2}{2\sigma^2})$.
 
 **条件高斯的封闭性**：若 $\mathbf{x}$ 和 $\mathbf{y}$ 的联合分布是高斯，则条件分布 $p(\mathbf{x}\mid\mathbf{y})$ 也是高斯。这是扩散模型前向/逆向过程全部用高斯分布建模的数学基础。
 
@@ -110,8 +110,8 @@ Kullback-Leibler (KL) 散度衡量两个概率分布 $q$ 和 $p$ 的"距离"：
 $$D_{\text{KL}}(q \| p) = \int q(\mathbf{x})\log\frac{q(\mathbf{x})}{p(\mathbf{x})}\,d\mathbf{x} = \mathbb{E}_{\mathbf{x}\sim q}\left[\log q(\mathbf{x}) - \log p(\mathbf{x})\right]$$
 
 **性质**：
-- $D_{\text{KL}}(q \| p) \geq 0$，等于 $0$ 当且仅当 $q = p$（几乎处处）
-- **非对称**：$D_{\text{KL}}(q \| p) \neq D_{\text{KL}}(p \| q)$
+- $D_{\text{KL}}(q \Vert p) \geq 0$，等于 $0$ 当且仅当 $q = p$（几乎处处）
+- **非对称**：$D_{\text{KL}}(q \Vert p) \neq D_{\text{KL}}(p \Vert q)$
 - 扩散模型中 $q$（前向过程）是已知的简单分布，$p_\theta$（逆向过程）被训练去逼近它
 
 **两个高斯分布之间的 KL 散度**（有闭式解）：
@@ -125,7 +125,7 @@ D_{\text{KL}}\big(\mathcal{N}(\boldsymbol{\mu}_q,\boldsymbol{\Sigma}_q)\,\big\|\
 \end{aligned}
 $$
 
-当 $\boldsymbol{\Sigma}_q = \boldsymbol{\Sigma}_p = \sigma^2\mathbf{I}$ 时简化为 $\frac{1}{2\sigma^2}\|\boldsymbol{\mu}_p - \boldsymbol{\mu}_q\|^2$. 这是 DDPM 将 ELBO 中的 KL 项转化为简单的 $\ell_2$ 回归的关键。
+当 $\boldsymbol{\Sigma}_q = \boldsymbol{\Sigma}_p = \sigma^2\mathbf{I}$ 时简化为 $\frac{1}{2\sigma^2}\Vert\boldsymbol{\mu}_p - \boldsymbol{\mu}_q\Vert^2$. 这是 DDPM 将 ELBO 中的 KL 项转化为简单的 $\ell_2$ 回归的关键。
 
 > **几何直觉**：当两个高斯的协方差相同时，KL 散度退化为**均值之间的欧几里得距离平方**
 > （除以 $2\sigma^2$）。这意味着最小化 KL 等价于让模型的均值 $\boldsymbol{\mu}_p$ 尽可能接近
@@ -137,7 +137,8 @@ $$
 
 重参数化技巧是深度学习中使用随机变量的标准方法。核心思想：将**带参数的随机性**拆分为**确定性变换 + 无参数噪声**。
 
-**示例**：抽样 $\mathbf{x} \sim \mathcal{N}(\boldsymbol{\mu}_\theta, \sigma_\theta^2\mathbf{I})$ 等价于：
+
+**示例**：抽样 $\mathbf{x} \sim \mathcal{N}(\boldsymbol{\mu}_{\theta}, \sigma_{\theta}^2\mathbf{I})$ 等价于：
 
 $$\mathbf{x} = \boldsymbol{\mu}_\theta + \sigma_\theta \cdot \boldsymbol{\epsilon}, \quad \boldsymbol{\epsilon} \sim \mathcal{N}(0,\mathbf{I})$$
 
@@ -178,7 +179,7 @@ $$\nabla_{\mathbf{x}_t}\log q(\mathbf{x}_t|\mathbf{x}_0) = -\frac{\mathbf{x}_t -
 
 $$\log p_\theta(\mathbf{x}) \geq \mathbb{E}_{q(\mathbf{z}|\mathbf{x})}\left[\log\frac{p_\theta(\mathbf{x},\mathbf{z})}{q(\mathbf{z}|\mathbf{x})}\right] =: \text{ELBO}$$
 
-**间隙**：$\log p_\theta(\mathbf{x}) - \text{ELBO} = D_{\text{KL}}(q(\mathbf{z}\mid\mathbf{x}) \| p_\theta(\mathbf{z}\mid\mathbf{x})) \geq 0$.
+**间隙**：$\log p_\theta(\mathbf{x}) - \text{ELBO} = D_{\text{KL}}(q(\mathbf{z}\mid\mathbf{x}) \Vert p_\theta(\mathbf{z}\mid\mathbf{x})) \geq 0$.
 
 在扩散模型中：
 - $\mathbf{z} = \mathbf{x}_{1:T}$ 是隐变量序列
@@ -189,7 +190,7 @@ $$\log p_\theta(\mathbf{x}) \geq \mathbb{E}_{q(\mathbf{z}|\mathbf{x})}\left[\log
 
 > **几何直觉**：ELBO 可以理解为"代理目标"。真正想优化的是 $\log p(\mathbf{x})$（数据的对数似然），
 > 但这无法直接计算（需要积分所有可能的隐变量路径）。ELBO 是它的**下界**（lower bound）——
-> 总是小于或等于真实值。两个量之间的差距恰好是 $D_{KL}(q\|p)$。
+> 总是小于或等于真实值。两个量之间的差距恰好是 $D_{KL}(q \Vert p)$。
 > 训练就是同时做两件事：(1) **提升 ELBO**（让模型更好），(2) **缩小 KL 差距**（让近似更紧）。
 > 详见 [fig-elbo-geometry.png]。
 
@@ -320,8 +321,8 @@ $$p_{\mathbf{x}}(\mathbf{x}) = p_{\mathbf{z}}(\phi^{-1}(\mathbf{x}))\left|\det\f
 ### 0.10 期望和 L2 范数记号
 
 - $\mathbb{E}_{q(\mathbf{x})}[f(\mathbf{x})] = \int f(\mathbf{x})q(\mathbf{x})d\mathbf{x}$：在分布 $q$ 下的期望。实际训练中用 Monte Carlo 估计（小批量平均）。
-- $\|\mathbf{x}\|^2 = \mathbf{x}^\top\mathbf{x} = \sum_i x_i^2$：向量的平方 $\ell_2$ 范数。
-- $\|\boldsymbol{\epsilon} - \hat{\boldsymbol{\epsilon}}\|^2$ 形式的目标函数本质上是回归任务的均方误差 (MSE)。
+- $\Vert\mathbf{x}\Vert^2 = \mathbf{x}^\top\mathbf{x} = \sum_i x_i^2$：向量的平方 $\ell_2$ 范数。
+- $\Vert\boldsymbol{\epsilon} - \hat{\boldsymbol{\epsilon}}\Vert^2$ 形式的目标函数本质上是回归任务的均方误差 (MSE)。
 
 ---
 
@@ -513,11 +514,11 @@ $$-\text{VLB} = \frac{1}{2}\mathbb{E}_{t,\boldsymbol{\epsilon}}\left[\frac{d\log
 
 ![KL散度的几何意义](figures/fig-kl-geometry.png)
 
-左图：$D_{KL}(q\|p)$ 是"mode-seeking"的——当真实分布 $q$ 有概率但模型 $p$ 没有时，惩罚极大（红色区域）。这解释了为什么扩散模型的逆向过程要以**精确匹配数据分布模式**为目标。
+左图：$D_{KL}(q \Vert p)$ 是"mode-seeking"的——当真实分布 $q$ 有概率但模型 $p$ 没有时，惩罚极大（红色区域）。这解释了为什么扩散模型的逆向过程要以**精确匹配数据分布模式**为目标。
 
-中图：$D_{KL}(p\|q)$ 是"mass-covering"的——当模型 $p$ 产生 $q$ 没有的样本时受惩罚。右图：两个高斯之间 KL 的闭式解：$D_{KL} = \frac{1}{2}\frac{\|\boldsymbol{\mu}_p-\boldsymbol{\mu}_q\|^2}{\sigma^2}$.
+中图：$D_{KL}(p \Vert q)$ 是"mass-covering"的——当模型 $p$ 产生 $q$ 没有的样本时受惩罚。右图：两个高斯之间 KL 的闭式解：$D_{KL} = \frac{1}{2}\frac{\Vert\boldsymbol{\mu}_p-\boldsymbol{\mu}_q\Vert^2}{\sigma^2}$.
 
-**为什么扩散模型用 $D_{KL}(q\|p)$？** 因为 $q$ 是已知的前向过程（简单的高斯条件分布），$p_\theta$ 是我们学习的逆向过程。我们想让 $p_\theta$ 精确覆盖 $q$ 的每个模式（即每个 $t$ 处的真实去噪方向）。
+**为什么扩散模型用 $D_{KL}(q \Vert p)$？** 因为 $q$ 是已知的前向过程（简单的高斯条件分布），$p_\theta$ 是我们学习的逆向过程。我们想让 $p_\theta$ 精确覆盖 $q$ 的每个模式（即每个 $t$ 处的真实去噪方向）。
 
 **主线节点 3**：SNR 是比 $\alpha_t$/$\sigma_t$ 更本质的变量。噪声调度的具体形式不重要，端点 SNR 才重要。
 
