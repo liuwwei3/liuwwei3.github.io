@@ -320,6 +320,7 @@ def main():
     parser.add_argument('source', help='Path to source .md file')
     parser.add_argument('--title', help='Override auto-detected title', default=None)
     parser.add_argument('--slug', help='Override output filename (without .md)', default=None)
+    parser.add_argument('--force', action='store_true', help='Overwrite existing files in blogs/')
     parser.add_argument('--dry-run', action='store_true', help='Simulate without writing/git')
     args = parser.parse_args()
 
@@ -351,10 +352,10 @@ def main():
         filename = slugify(title, source)
     dest_path = BLOGS_DIR / filename
 
-    if dest_path.exists() and not args.dry_run:
+    if dest_path.exists() and not args.dry_run and not args.force:
         print(json.dumps({
             "status": "error",
-            "message": f"'{filename}' already exists in blogs/. Remove it first or use a different source."
+            "message": f"'{filename}' already exists in blogs/. Use --force to overwrite."
         }))
         sys.exit(1)
 
