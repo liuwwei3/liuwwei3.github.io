@@ -95,7 +95,11 @@ $$\mathcal{N}(\boldsymbol{\mu}, \sigma^2\mathbf{I}) = \boldsymbol{\mu} + \sigma 
 
 ![高斯分布几何](figures/fig-gaussian-2d.png)
 
-**几何直观**：左图是各向同性高斯——等高线是完美的圆，所有方向的方差相同（特征值相等）。在扩散模型中，每一步加的就是这种"球形"噪声。中图展示相关高斯——协方差矩阵的非对角元素使等高线倾斜，特征向量（箭头）标示了数据变化的主方向。右图展示**条件高斯**的关键性质：固定 $x$ 的值（虚线），$y$ 的条件分布仍然是高斯——这就是为什么扩散模型每步的去噪可以用单一的高斯条件分布来描述。
+**几何直观**：左图是各向同性高斯——等高线是完美的圆，所有方向的方差相同（特征值相等）。
+在扩散模型中，每一步加的就是这种"球形"噪声。
+中图展示相关高斯——协方差矩阵的非对角元素使等高线倾斜，特征向量（箭头）标示了数据变化的主方向。
+右图展示**条件高斯**的关键性质：固定 $x$ 的值（虚线），$y$ 的条件分布仍然是高斯——
+这就是为什么扩散模型每步的去噪可以用单一的高斯条件分布来描述。
 
 > **直觉**：如果联合分布是"椭球形"的（高斯），那么任何"切片"（条件分布）也是椭球形的。扩散模型的推理过程就是一个大高斯分布上的逐维切片。
 
@@ -112,11 +116,22 @@ $$D_{\text{KL}}(q \| p) = \int q(\mathbf{x})\log\frac{q(\mathbf{x})}{p(\mathbf{x
 
 **两个高斯分布之间的 KL 散度**（有闭式解）：
 
-$$D_{\text{KL}}\big(\mathcal{N}(\boldsymbol{\mu}_q,\boldsymbol{\Sigma}_q)\,\big\|\,\mathcal{N}(\boldsymbol{\mu}_p,\boldsymbol{\Sigma}_p)\big) = \frac{1}{2}\!\left[\log\frac{|\boldsymbol{\Sigma}_p|}{|\boldsymbol{\Sigma}_q|} - d + \text{tr}(\boldsymbol{\Sigma}_p^{-1}\boldsymbol{\Sigma}_q) + (\boldsymbol{\mu}_p-\boldsymbol{\mu}_q)^\top\boldsymbol{\Sigma}_p^{-1}(\boldsymbol{\mu}_p-\boldsymbol{\mu}_q)\right]$$
+$$
+\begin{aligned}
+D_{\text{KL}}\big(\mathcal{N}(\boldsymbol{\mu}_q,\boldsymbol{\Sigma}_q)\,\big\|\,\mathcal{N}(\boldsymbol{\mu}_p,\boldsymbol{\Sigma}_p)\big)
+= \frac{1}{2}\!\Big[ &\log\frac{|\boldsymbol{\Sigma}_p|}{|\boldsymbol{\Sigma}_q|} - d \\
+&+ \text{tr}(\boldsymbol{\Sigma}_p^{-1}\boldsymbol{\Sigma}_q) \\
+&+ (\boldsymbol{\mu}_p-\boldsymbol{\mu}_q)^\top\boldsymbol{\Sigma}_p^{-1}(\boldsymbol{\mu}_p-\boldsymbol{\mu}_q)\Big]
+\end{aligned}
+$$
 
 当 $\boldsymbol{\Sigma}_q = \boldsymbol{\Sigma}_p = \sigma^2\mathbf{I}$ 时简化为 $\frac{1}{2\sigma^2}\|\boldsymbol{\mu}_p - \boldsymbol{\mu}_q\|^2$. 这是 DDPM 将 ELBO 中的 KL 项转化为简单的 $\ell_2$ 回归的关键。
 
-> **几何直觉**：当两个高斯的协方差相同时，KL 散度退化为**均值之间的欧几里得距离平方**（除以 $2\sigma^2$）。这意味着最小化 KL 等价于让模型的均值 $\boldsymbol{\mu}_p$ 尽可能接近真实均值 $\boldsymbol{\mu}_q$——这正是 MSE 回归。当协方差不同时，KL 散度还惩罚方向性的不匹配（通过 $\log\frac{|\Sigma_p|}{|\Sigma_q|}$ 和 $\text{tr}(\Sigma_p^{-1}\Sigma_q)$ 项）。详见第四章的 [fig-kl-geometry.png] 分析。
+> **几何直觉**：当两个高斯的协方差相同时，KL 散度退化为**均值之间的欧几里得距离平方**
+> （除以 $2\sigma^2$）。这意味着最小化 KL 等价于让模型的均值 $\boldsymbol{\mu}_p$ 尽可能接近
+> 真实均值 $\boldsymbol{\mu}_q$——这正是 MSE 回归。当协方差不同时，KL 散度还惩罚方向性
+> 的不匹配（通过 $\log\frac{|\Sigma_p|}{|\Sigma_q|}$ 和 $\text{tr}(\Sigma_p^{-1}\Sigma_q)$ 项）。
+> 详见第四章的 [fig-kl-geometry.png] 分析。
 
 ### 0.3 重参数化技巧
 
@@ -150,7 +165,10 @@ $$\nabla_{\mathbf{x}_t}\log q(\mathbf{x}_t|\mathbf{x}_0) = -\frac{\mathbf{x}_t -
 
 这解释了为什么噪声预测等价于得分估计。
 
-> **几何直觉**：得分函数在 1D 情形中就是 $\frac{d}{dx}\log p(x)$。想象一个钟形曲线（高斯密度）——在曲线左侧，$\log p$ 随 $x$ 增大而增大，所以得分是**正的**（指向右，朝峰顶）；在右侧，得分是**负的**（指向左，朝峰顶）；在峰顶，得分为零（已达最高点）。详见第二章的 [fig-score-field.png]。
+> **几何直觉**：得分函数在 1D 情形中就是 $\frac{d}{dx}\log p(x)$。想象一个钟形曲线（高斯密度）——
+> 在曲线左侧，$\log p$ 随 $x$ 增大而增大，得分是**正的**（指向右，朝峰顶）；
+> 在右侧，得分是**负的**（指向左，朝峰顶）；在峰顶，得分为零（已达最高点）。
+> 详见第二章的 [fig-score-field.png]。
 
 ### 0.5 ELBO 与变分推断
 
@@ -169,7 +187,11 @@ $$\log p_\theta(\mathbf{x}) \geq \mathbb{E}_{q(\mathbf{z}|\mathbf{x})}\left[\log
 
 训练目标就是最大化 ELBO。
 
-> **几何直觉**：ELBO 可以理解为"代理目标"。真正想优化的是 $\log p(\mathbf{x})$（数据的对数似然），但这无法直接计算（需要积分所有可能的隐变量路径）。ELBO 是它的**下界**（lower bound）——总是小于或等于真实值。两个量之间的差距恰好是 $D_{KL}(q\|p)$。训练就是同时做两件事：(1) **提升 ELBO**（让模型更好），(2) **缩小 KL 差距**（让近似更紧）。详见 [fig-elbo-geometry.png]。
+> **几何直觉**：ELBO 可以理解为"代理目标"。真正想优化的是 $\log p(\mathbf{x})$（数据的对数似然），
+> 但这无法直接计算（需要积分所有可能的隐变量路径）。ELBO 是它的**下界**（lower bound）——
+> 总是小于或等于真实值。两个量之间的差距恰好是 $D_{KL}(q\|p)$。
+> 训练就是同时做两件事：(1) **提升 ELBO**（让模型更好），(2) **缩小 KL 差距**（让近似更紧）。
+> 详见 [fig-elbo-geometry.png]。
 
 ### 0.6 马尔可夫链
 
@@ -185,7 +207,9 @@ $$p(\mathbf{x}_t | \mathbf{x}_{t-1}, \mathbf{x}_{t-2}, \ldots, \mathbf{x}_0) = p
 
 ![马尔可夫链](figures/fig-markov-chain.png)
 
-**几何直观**：左图是两状态离散马尔可夫链——未来状态只取决于当前所在位置，转移概率矩阵 $P$ 完全定义了动力学。右图展示了连续状态空间中的马尔可夫随机游走：每个位置的"下一步"是一个以当前位置为中心的高斯分布（淡蓝色云），这意味着**给定当前位置，下一位置的条件分布被完全确定**——无论你是如何到达当前点的。
+**几何直观**：左图是两状态离散马尔可夫链——未来状态只取决于当前所在位置，转移概率矩阵 $P$ 完全定义了动力学。
+右图展示了连续状态空间中的马尔可夫随机游走：每个位置的"下一步"是一个以当前位置为中心的高斯分布
+（淡蓝色云），这意味着**给定当前位置，下一位置的条件分布被完全确定**——无论你是如何到达当前点的。
 
 > **直觉**：马尔可夫链就像**喝醉的人走路**——下一步往哪走只取决于现在站在哪里，不记得怎么来的。扩散模型的前向过程就是醉汉向着噪声方向走，逆向过程是神经网络引导他反向走回原点。
 
@@ -230,7 +254,8 @@ $$d\mathbf{x} = \big[\mathbf{f}(\mathbf{x}, t) - g(t)^2\nabla_{\mathbf{x}}\log p
 
 **右上（漂移 + 扩散）**：粒子在随机游走的同时被一个向下的力（$\mu=-1$）拉向负方向。黑色虚线是确定性部分（$\mu t$），灰色包络是叠加的随机扩散（$\pm 2\sigma\sqrt{t}$）。
 
-**左下（漂移 vs 扩散的对比）**：漂移 $\mathbf{f}$（蓝色箭头）确定方向，扩散（红色区域）添加随机扰动。在实际扩散模型中，**正向 SDE** 的 $\mathbf{f}$ 指向噪声（数据→噪声），**逆向 SDE** 的 $\mathbf{f} - g^2\nabla\log p_t$ 指向数据（噪声→数据）。
+**左下（漂移 vs 扩散的对比）**：漂移 $\mathbf{f}$（蓝色箭头）确定方向，扩散（红色区域）添加随机扰动。
+在实际扩散模型中，**正向 SDE** 的 $\mathbf{f}$ 指向噪声，**逆向 SDE** 的 $\mathbf{f} - g^2\nabla\log p_t$ 指向数据。
 
 **右下（离散→连续极限）**：步数越多（$N$ 越大），离散马尔可夫链越接近连续 SDE 的轨迹。扩散模型的 $T=1000$ 步离散化就是对连续 SDE 的精细近似。
 
@@ -379,7 +404,9 @@ $$\nabla_{\mathbf{x}_t}\log q(\mathbf{x}_t|\mathbf{x}_0) = -\frac{\boldsymbol{\e
 
 上图展示了一个 2D 环形数据分布（t=0）如何在 5 步扩散中逐渐被高斯噪声淹没。SNR 从 ∞ dB 衰减到接近 0 dB——信息被系统性地抹去。
 
-**重参数化的几何意义**：$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon}$ 是一个**凸组合**（convex combination）——更准确地说，是 $\mathbf{x}_0$ 和 $\boldsymbol{\epsilon}$ 的加权和，权重平方和为 1。在几何上，$\mathbf{x}_t$ 位于连接 $\mathbf{x}_0$ 和某个高斯噪声样本的线段上的某处，越接近 $t=T$ 越靠近纯噪声。
+**重参数化的几何意义**：$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon}$ 是一个**凸组合**
+（convex combination）——更准确地说，是 $\mathbf{x}_0$ 和 $\boldsymbol{\epsilon}$ 的加权和，权重平方和为 1。
+在几何上，$\mathbf{x}_t$ 位于连接 $\mathbf{x}_0$ 和某个高斯噪声样本的线段上的某处，越接近 $t=T$ 越靠近纯噪声。
 
 ![重参数化技巧](figures/fig-reparam-trick.png)
 
@@ -758,5 +785,8 @@ $$f_\theta(\mathbf{x}_T, T) \to \mathbf{x}_0 \quad \text{(一步生成)}$$
 | ODE / PF-ODE / Euler 求解 | 第二、五章 | 0.8 |
 | Push-forward / 变量替换 | 第六、七章 | 0.9 |
 | 期望 / L2 范数 | 全文 | 0.10 |
+
+
+
 
 [← 回到首页](..)
