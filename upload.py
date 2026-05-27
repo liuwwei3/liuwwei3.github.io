@@ -267,6 +267,11 @@ def update_index(path: Path, entry: str, dry_run: bool) -> bool:
         print(json.dumps({"status": "error", "message": "## 博客 section not found in index"}), file=sys.stderr)
         return False
 
+    # Remove existing duplicate entries with the same slug
+    # Entry format: '- [...](blogs/<slug>)...'
+    slug = entry.split('](blogs/')[1].split(')')[0] if '](blogs/' in entry else ''
+    lines = [l for l in lines if f'(blogs/{slug})' not in l]
+
     # Find the first list item after ## 博客
     insert_at = blog_idx + 1
     while insert_at < len(lines) and lines[insert_at].strip() == '':
