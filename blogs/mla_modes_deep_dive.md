@@ -25,7 +25,7 @@ title: MLA 双模式深度专题：MHA 模式 vs MQA 模式
 
 在之前的讨论中，我们提出了一个核心矛盾：
 
-> MHA 模式训练出来的参数（$`\mathbf{W}^{UK}`$ 和 $`\mathbf{W}^{UV}`$），在 MQA 模式下被绕过了，那推理时的输出和训练时能一致吗？
+> MHA 模式训练出来的参数（$\mathbf{W}^{UK}$ 和 $\mathbf{W}^{UV}$），在 MQA 模式下被绕过了，那推理时的输出和训练时能一致吗？
 
 这是一个无法回避的问题。答案分为两层：
 - **数学层面**：两种模式在代数上**严格等价**——矩阵吸收利用乘法的结合律和线性变换的可交换性，保证了输出恒等
@@ -39,12 +39,12 @@ title: MLA 双模式深度专题：MHA 模式 vs MQA 模式
 
 | 符号 | 含义 | V3 取值 |
 |------|------|:------:|
-| $`d`$ | 隐藏维度 | 7168 |
-| $`n_h`$ | 注意力头数 | 128 |
-| $`d_h`$ | 每头内容维度（无位置部分） | 128 |
-| $`d_h^R`$ | 每头 RoPE 维度 | 64 |
-| $`d_c`$ | KV 联合压缩维度（`kv_lora_rank`） | 512 |
-| $`d_c'`$ | Query 压缩维度（`q_lora_rank`） | 1536 |
+| $d$ | 隐藏维度 | 7168 |
+| $n_h$ | 注意力头数 | 128 |
+| $d_h$ | 每头内容维度（无位置部分） | 128 |
+| $d_h^R$ | 每头 RoPE 维度 | 64 |
+| $d_c$ | KV 联合压缩维度（`kv_lora_rank`） | 512 |
+| $d_c'$ | Query 压缩维度（`q_lora_rank`） | 1536 |
 
 ---
 
@@ -64,7 +64,7 @@ attn_impl: Literal["naive", "absorb"] = "absorb"
 ```
 
 - **`"naive"`** → MHA 模式：缓存完整的逐头 K/V
-- **`"absorb"`** → MQA 模式：仅缓存压缩后的 $`\mathbf{c}^{KV}`$ + $`\mathbf{k}^R`$，推理时通过矩阵吸收计算注意力
+- **`"absorb"`** → MQA 模式：仅缓存压缩后的 $\mathbf{c}^{KV}$ + $\mathbf{k}^R$，推理时通过矩阵吸收计算注意力
 
 ### 2.2 MLA 参数初始化代码
 
@@ -237,9 +237,9 @@ $$
 
 MQA 模式对应 `attn_impl = "absorb"` 或 V2-profile 中的 **Absorbed_CacheCompressed (A_CC)**。
 
-**缓存内容**：仅 $`\mathbf{c}^{KV}`$（压缩 KV 潜在向量）和 $`\mathbf{k}^R`$（位置 Key）。
+**缓存内容**：仅 $\mathbf{c}^{KV}$（压缩 KV 潜在向量）和 $\mathbf{k}^R$（位置 Key）。
 
-**核心优化**：矩阵吸收 —— $`\mathbf{W}^{UK}`$ 和 $`\mathbf{W}^{UV}`$ 不显式调用，而是吸收到注意力计算中。
+**核心优化**：矩阵吸收 —— $\mathbf{W}^{UK}$ 和 $\mathbf{W}^{UV}$ 不显式调用，而是吸收到注意力计算中。
 
 ### 4.2 吸收的数学变换
 
@@ -363,38 +363,38 @@ $$
 
 128K 序列 × 60 层 = **1.152 KB × 131072 × 60 ≈ 8.5 GB**。
 
-相比 MHA 模式（600 GB），缩减了约 **71 倍**（$`40960/576 \approx 71.1\times`$）。
+相比 MHA 模式（600 GB），缩减了约 **71 倍**（$40960/576 \approx 71.1\times$）。
 
 ---
 
 ## 5. 关键差异：两个矩阵的命运
 
-### 5.1 $`\mathbf{W}^{UK}`$ —— 从解压器到吸收器
+### 5.1 $\mathbf{W}^{UK}$ —— 从解压器到吸收器
 
 | | MHA 模式 | MQA 模式 |
 |---|---|---|
-| 调用方式 | 显式计算 $`\mathbf{k}_i^C = \mathbf{W}_i^{UK} \cdot \mathbf{c}^{KV}`$ | 预吸收到 Query 侧：$`(\mathbf{W}_i^{UQ})^\top \mathbf{W}_i^{UK}`$ |
-| 作用对象 | $`\mathbf{c}^{KV}`$（Key 侧） | $`\mathbf{q}_i^C`$（Query 侧） |
+| 调用方式 | 显式计算 $\mathbf{k}_i^C = \mathbf{W}_i^{UK} \cdot \mathbf{c}^{KV}$ | 预吸收到 Query 侧：$(\mathbf{W}_i^{UQ})^\top \mathbf{W}_i^{UK}$ |
+| 作用对象 | $\mathbf{c}^{KV}$（Key 侧） | $\mathbf{q}_i^C$（Query 侧） |
 | 输出 | 16384 维逐头 K | 矩阵吸收后，Query 维度从 128 扩展到 512 |
 
 这等价于把"展开 K 再内积"替换为"吸收 W^UK 到 Q 侧，直接用压缩的 c^KV 做内积"——数学上完全等价（对于内容部分），但内存完全不同。
 
-### 5.2 $`\mathbf{W}^{UV}`$ —— 从解压器到后处理器
+### 5.2 $\mathbf{W}^{UV}$ —— 从解压器到后处理器
 
 | | MHA 模式 | MQA 模式 |
 |---|---|---|
-| 调用方式 | 显式计算 $`\mathbf{v}_i = \mathbf{W}_i^{UV} \cdot \mathbf{c}^{KV}`$ | 延迟到加权和之后：$`\mathbf{W}_i^{UV} \cdot (\sum_j a_j \mathbf{c}_j^{KV})`$ |
+| 调用方式 | 显式计算 $\mathbf{v}_i = \mathbf{W}_i^{UV} \cdot \mathbf{c}^{KV}$ | 延迟到加权和之后：$\mathbf{W}_i^{UV} \cdot (\sum_j a_j \mathbf{c}_j^{KV})$ |
 | 调用时刻 | Attention 之前 | Attention 之后 |
 
 同样数学等价——矩阵乘法和加权求和的线性性质保证。
 
 ### 5.3 严格等价性证明：两种模式的 Score 完全一致
 
-表面上看，MHA 模式有 128 个不同的 $`\mathbf{k}_i`$，而 MQA 模式所有头共享 $`\mathbf{c}^{KV}`$，直觉上"Key 的多样性"似乎丢失了。但矩阵吸收保证了两种模式**在数学上严格等价**——下面用代数一步步证明。
+表面上看，MHA 模式有 128 个不同的 $\mathbf{k}_i$，而 MQA 模式所有头共享 $\mathbf{c}^{KV}$，直觉上"Key 的多样性"似乎丢失了。但矩阵吸收保证了两种模式**在数学上严格等价**——下面用代数一步步证明。
 
 #### 5.3.1 内容分数的等价性
 
-**MHA 模式的内容分数**（头 $`i`$，Query 位置 $`t`$，Key 位置 $`j`$）：
+**MHA 模式的内容分数**（头 $i$，Query 位置 $t$，Key 位置 $j$）：
 
 $$
 S_{t,j,i}^{\text{MHA}} = (\mathbf{q}_{t,i}^C)^\top \cdot \mathbf{k}_{j,i}^C = (\mathbf{W}_i^{UQ} \mathbf{c}_t^Q)^\top \cdot (\mathbf{W}_i^{UK} \mathbf{c}_j^{KV})
@@ -425,23 +425,23 @@ $$
 S_{t,j,i}^{\text{MHA}} = \sum_{d=1}^{d_h} \sum_{c=1}^{d_c} (\mathbf{W}_i^{UQ} \mathbf{c}_t^Q)_d \cdot (\mathbf{W}_i^{UK})_{d,c} \cdot (\mathbf{c}_j^{KV})_c = S_{t,j,i}^{\text{MQA}}
 $$
 
-**两者逐项完全相等。** 唯一的区别是求和顺序——MHA 先求和 $`c`$（K 方向的解压），再求和 $`d`$（Q-K 内积）；MQA 先求和 $`d`$（吸收 W^UK 到 Q 侧），再求和 $`c`$（压缩空间内的内积）。**有限维求和的交换律保证了结果恒等。**
+**两者逐项完全相等。** 唯一的区别是求和顺序——MHA 先求和 $c$（K 方向的解压），再求和 $d$（Q-K 内积）；MQA 先求和 $d$（吸收 W^UK 到 Q 侧），再求和 $c$（压缩空间内的内积）。**有限维求和的交换律保证了结果恒等。**
 
 #### 5.3.2 Value 加权的等价性
 
-**MHA 模式**（头 $`i`$）：
+**MHA 模式**（头 $i$）：
 
 $$
 \mathbf{o}_i^{\text{MHA}} = \sum_{j=1}^{t} a_{t,j} \cdot \underbrace{(\mathbf{W}_i^{UV} \mathbf{c}_j^{KV})}_{\mathbf{v}_{j,i} \in \mathbb{R}^{d_h}}
 $$
 
-**MQA 吸收模式**（头 $`i`$）：
+**MQA 吸收模式**（头 $i$）：
 
 $$
 \mathbf{o}_i^{\text{MQA}} = \mathbf{W}_i^{UV} \cdot \underbrace{\left(\sum_{j=1}^{t} a_{t,j} \cdot \mathbf{c}_j^{KV}\right)}_{\text{o\_compressed} \in \mathbb{R}^{d_c}}
 $$
 
-**等价性**：$`\mathbf{W}_i^{UV}`$ 是线性映射，加权和是线性组合，两者可交换：
+**等价性**：$\mathbf{W}_i^{UV}$ 是线性映射，加权和是线性组合，两者可交换：
 
 $$
 \mathbf{W}_i^{UV} \cdot \left(\sum_j a_{t,j} \mathbf{c}_j^{KV}\right) = \sum_j a_{t,j} \cdot \mathbf{W}_i^{UV} \mathbf{c}_j^{KV}
@@ -453,7 +453,7 @@ $$
 
 既然数学上严格等价，理论上输出差异应为零。实际可观测的微小差异（< 0.1%）并非来自"模型能力损失"，而是 BF16 浮点精度和实现细节——详见第 6 章。
 
-> **关键结论**：吸收不是"近似"，是精确的代数变换。每头通过 $`\mathbf{W}_i^{UK}`$ 从 $`\mathbf{c}^{KV}`$ 中提取的信息，在 MQA 吸收模式下通过 $`\mathbf{W}_i^{UQ} \cdot \mathbf{W}_i^{UK}`$ 被**完整保留**到了 Query 侧。
+> **关键结论**：吸收不是"近似"，是精确的代数变换。每头通过 $\mathbf{W}_i^{UK}$ 从 $\mathbf{c}^{KV}$ 中提取的信息，在 MQA 吸收模式下通过 $\mathbf{W}_i^{UQ} \cdot \mathbf{W}_i^{UK}$ 被**完整保留**到了 Query 侧。
 
 ---
 
@@ -475,16 +475,16 @@ $$
 
 | 模式 | 求和顺序 | 中间结果 | 精度影响 |
 |------|----------|----------|----------|
-| MHA | 先 $`\sum_c (\mathbf{W}^{UK})_{d,c} (\mathbf{c}^{KV})_c`$，再 $`\sum_d (\mathbf{q}^C)_d \cdot (\mathbf{k}^C)_d`$ | $`\mathbf{k}^C \in \mathbb{R}^{d_h}`$ (128 维) | 每次 $`d_h \times d_c`$ 次乘法-加法 |
-| MQA Absorb | 先 $`\sum_d (\mathbf{q}^C)_d (\mathbf{W}^{UK})_{d,c}`$，再 $`\sum_c (\text{q\_absorb})_c (\mathbf{c}^{KV})_c`$ | $`\text{q\_absorb} \in \mathbb{R}^{d_c}`$ (512 维) | 每次 $`d_h \times d_c`$ 次乘法-加法 |
+| MHA | 先 $\sum_c (\mathbf{W}^{UK})_{d,c} (\mathbf{c}^{KV})_c$，再 $\sum_d (\mathbf{q}^C)_d \cdot (\mathbf{k}^C)_d$ | $\mathbf{k}^C \in \mathbb{R}^{d_h}$ (128 维) | 每次 $d_h \times d_c$ 次乘法-加法 |
+| MQA Absorb | 先 $\sum_d (\mathbf{q}^C)_d (\mathbf{W}^{UK})_{d,c}$，再 $\sum_c (\text{q\_absorb})_c (\mathbf{c}^{KV})_c$ | $\text{q\_absorb} \in \mathbb{R}^{d_c}$ (512 维) | 每次 $d_h \times d_c$ 次乘法-加法 |
 
-BF16 的有效精度约为 7-8 位十进制有效数字。两种顺序下，$`128 \times 512 = 65536`$ 次乘加操作的舍入误差累积路径不同，导致的相对误差约为：
+BF16 的有效精度约为 7-8 位十进制有效数字。两种顺序下，$128 \times 512 = 65536$ 次乘加操作的舍入误差累积路径不同，导致的相对误差约为：
 
 $$
 \epsilon_{\text{BF16}} \approx \sqrt{65536} \times 2^{-7} \approx 256 \times 7.8 \times 10^{-3} \approx 2 \times 10^0 \;\text{ULP}
 $$
 
-折算到归一化后的输出范数，约 $`10^{-3} \sim 10^{-4}`$ 量级。
+折算到归一化后的输出范数，约 $10^{-3} \sim 10^{-4}$ 量级。
 
 ### 6.3 差异来源二：RoPE / 位置部分
 
@@ -505,15 +505,15 @@ $$
 \text{score} = \text{score}_{\text{nope}} + \text{score}_{\text{pe}}
 $$
 
-两者数学上等价（内积的可加性：$`[\mathbf{a};\mathbf{b}]^\top[\mathbf{c};\mathbf{d}] = \mathbf{a}^\top\mathbf{c} + \mathbf{b}^\top\mathbf{d}`$），但在 BF16 下，分开计算再相加 vs 拼接后计算，中间结果的量级和舍入点不同，产生了约 $`10^{-4}`$ 量级的额外差异。
+两者数学上等价（内积的可加性：$[\mathbf{a};\mathbf{b}]^\top[\mathbf{c};\mathbf{d}] = \mathbf{a}^\top\mathbf{c} + \mathbf{b}^\top\mathbf{d}$），但在 BF16 下，分开计算再相加 vs 拼接后计算，中间结果的量级和舍入点不同，产生了约 $10^{-4}$ 量级的额外差异。
 
 ### 6.4 为什么训练仍需 MHA 模式
 
 既然推理时两种模式输出几乎一致，为什么训练不直接用 MQA 模式？
 
-1. **梯度路径不同**：MHA 模式下，$`\mathbf{W}^{UK}`$ 和 $`\mathbf{W}^{UV}`$ 各自有独立的梯度路径。120 亿参数的模型中，更丰富的梯度信号有助于找到更好的局部最小值。
+1. **梯度路径不同**：MHA 模式下，$\mathbf{W}^{UK}$ 和 $\mathbf{W}^{UV}$ 各自有独立的梯度路径。120 亿参数的模型中，更丰富的梯度信号有助于找到更好的局部最小值。
 
-2. **优化器状态**：AdamW/ Muon 优化器的二阶矩估计对不同参数有不同的自适应学习率。$`\mathbf{W}^{UK}`$ 和 $`\mathbf{W}^{UV}`$ 作为独立参数矩阵，各自收敛到最适合自己"职责"的方向。
+2. **优化器状态**：AdamW/ Muon 优化器的二阶矩估计对不同参数有不同的自适应学习率。$\mathbf{W}^{UK}$ 和 $\mathbf{W}^{UV}$ 作为独立参数矩阵，各自收敛到最适合自己"职责"的方向。
 
 3. **训练稳定性**：训练时在 MHA 模式下展开的完整注意矩阵，为 attention dropout、梯度裁剪等正则化提供了更细粒度的控制。
 
@@ -523,12 +523,12 @@ $$
 
 | 差异来源 | 数学上 | BF16 下 | 可观测性 |
 |----------|:------:|:-------:|:--------:|
-| 内容分数（K 侧） | 恒等 | $`\sim 10^{-4}`$ | 不可观测 |
-| Value 加权（V 侧） | 恒等 | $`\sim 10^{-4}`$ | 不可观测 |
-| RoPE 拼接 vs 分离 | 恒等 | $`\sim 10^{-4}`$ | 不可观测 |
-| **合计** | **0** | **$`\sim 10^{-3}`$** | **对单 token 不可观测** |
+| 内容分数（K 侧） | 恒等 | $\sim 10^{-4}$ | 不可观测 |
+| Value 加权（V 侧） | 恒等 | $\sim 10^{-4}$ | 不可观测 |
+| RoPE 拼接 vs 分离 | 恒等 | $\sim 10^{-4}$ | 不可观测 |
+| **合计** | **0** | **$\sim 10^{-3}$** | **对单 token 不可观测** |
 
-对完整序列生成（如 1024 token），差异可能累积到 $`10^{-2} \sim 10^{-1}`$ 量级的 logits 差异，但在 benchmark 级别的评估中（如 MMLU、HumanEval），这个量级的输出差异不足以改变预测结果——因此两种模式的 benchmark 得分差异 < 0.1%。
+对完整序列生成（如 1024 token），差异可能累积到 $10^{-2} \sim 10^{-1}$ 量级的 logits 差异，但在 benchmark 级别的评估中（如 MMLU、HumanEval），这个量级的输出差异不足以改变预测结果——因此两种模式的 benchmark 得分差异 < 0.1%。
 
 > **一句话**：MHA 和 MQA 的 gap 不是"模型能力"的差异，而纯粹是**浮点运算的数值噪声**。矩阵吸收不是近似，是精确代数变换。
 
