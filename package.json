@@ -1,0 +1,16 @@
+{
+  "name": "liuwwei3.github.io",
+  "private": true,
+  "scripts": {
+    "build-math": "node build-math.js"
+  },
+  "dependencies": {
+    "katex": "^0.16.0",
+    "rehype-katex": "^7.0.0",
+    "rehype-stringify": "^10.0.0",
+    "remark-math": "^6.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.0.0",
+    "unified": "^11.0.0"
+  }
+}
