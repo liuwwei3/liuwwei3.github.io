@@ -994,175 +994,220 @@ image = vae.decode(latents)              # 潜空间→图像
 
 ## 第五章：设计空间统一与快速采样
 
-### 5.1 EDM——以 $\sigma$ 为中心的全新设计 (Karras et al., 2022)
+### 5.0 问题引入：设计空间的混乱
 
-EDM 将扩散模型从 SDE 推导的繁重理论中解放出来，转向以**噪声标准差 $\sigma$** 为自变量的实用 ODE 框架（§0.8）。
+前四章建立了扩散模型的数学框架，但实践中留下了大量"怎么做"的问题：
+- 噪声调度用线性的还是余弦的？EDM 论文测试了六种，结论是什么？
+- 网络应该预测噪声 $\boldsymbol{\epsilon}$、去噪图像 $\mathbf{x}_0$、还是得分 $\mathbf{s}$？
+- 采样时 ODE 好还是 SDE 好？步长怎么选？
+- 训练时不同噪声水平的 Loss 权重怎么定？
 
-**概率流 ODE**（简化形式）：
+这些问题看似独立，实际都指向同一个诉求：**把设计空间理清楚，找出真正重要的自由度**。
+本章介绍两个里程碑工作——EDM 用 $\sigma$ 为轴统一了设计空间，DPM-Solver 用半线性结构将推理加速到极致。
 
+### 5.1 EDM——以噪声水平 $\sigma$ 为中心 (Karras et al., 2022)
+
+**核心思想**：扩散模型的所有设计选择（调度、预测目标、权重、采样器）都可以用**噪声标准差 $\sigma$** 这一个变量来表达。第三章告诉我们 SNR 的端点决定模型，EDM 进一步证明：**中间的一切也可以围绕 $\sigma$ 组织**。
+
+**统一 ODE**：将 PF-ODE 写成以 $\sigma$ 为自变量的最简形式：
 $$d\mathbf{x} = -\sigma\,\nabla_{\mathbf{x}}\log p(\mathbf{x};\sigma)\,d\sigma$$
 
-**Preconditioning**（预条件）——利用 §0.3 的思路，对网络输入/输出缩放以稳定训练：
-
-$$D_\theta(\mathbf{x};\sigma) = c_{\text{skip}}(\sigma)\,\mathbf{x} + c_{\text{out}}(\sigma)F_\theta\big(c_{\text{in}}(\sigma)\,\mathbf{x};\,c_{\text{noise}}(\sigma)\big)$$
-
-其中去噪器 $D_\theta$ 与得分的关系（利用 §0.4）：
-
+**从得分到去噪器**：实际训练中不直接预测得分，而是预测**去噪后的图像** $D_\theta(\mathbf{x};\sigma) \approx \mathbb{E}[\mathbf{x}_0 \mid \mathbf{x}_t=\mathbf{x}]$。得分与去噪器的关系：
 $$\nabla_{\mathbf{x}}\log p(\mathbf{x};\sigma) = \frac{D_\theta(\mathbf{x};\sigma) - \mathbf{x}}{\sigma^2}$$
 
-$c_{\text{skip}}$, $c_{\text{out}}$, $c_{\text{in}}$ 的选取使得网络输入 $c_{\text{in}}\mathbf{x}$ 和输出目标 $(D - c_{\text{skip}}\mathbf{x})/c_{\text{out}}$ 在所有 $\sigma$ 水平上保持单位方差。
+**Preconditioning（预条件）**：核心工程技巧。网络 $F_\theta$ 的输入输出被精心缩放，使得在所有噪声水平下训练信号均匀：
+$$D_\theta(\mathbf{x};\sigma) = c_{\text{skip}}(\sigma)\,\mathbf{x} + c_{\text{out}}(\sigma)F_\theta\big(c_{\text{in}}(\sigma)\,\mathbf{x};\,c_{\text{noise}}(\sigma)\big)$$
 
-### 5.2 DPM-Solver——利用半线性结构 (Lu et al., 2022)
+$c_{\text{skip}}$ 让网络只需预测残差（而非完整图像），$c_{\text{in}}$ 保证输入方差为 1，$c_{\text{out}}$ 保证输出目标方差为 1。这大幅稳定了训练，使得同一个网络在不同 $\sigma$ 下都能有效学习。
 
-DPM-Solver 揭示了扩散 ODE 的**半线性结构**（§0.8）：
+**训练目标**：等权重的去噪误差，用 $\sigma^2$ 归一化：
+$$\mathcal{L} = \mathbb{E}_{\sigma,\mathbf{x}_0,\mathbf{n}}\left[\frac{1}{\sigma^2}\|D_\theta(\mathbf{x}_0+\mathbf{n};\sigma) - \mathbf{x}_0\|^2\right]$$
 
-$$\frac{d\mathbf{x}_t}{dt} = f(t)\mathbf{x}_t + \underbrace{\frac{g(t)^2}{2\sigma_t}\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t)}_{\text{非线性项}}$$
+**Heun 二阶采样器**：EDM 推荐的采样器，35 步可达 1000 步质量。
 
-线性部分 $d\mathbf{x}_t/dt - f(t)\mathbf{x}_t = 0$ 有精确解。通过**指数积分**（将 §0.7 的 ODE 求解器思想与扩散 ODE 的特殊结构结合），只对非线性项做数值近似：
+**贡献总结**：EDM 把扩散模型中"调参"的玄学变成了"选 $\sigma$ 调度"的科学。后续所有工作（DPM-Solver、Consistency Models）都建立在 EDM 的 $\sigma$ 参数化之上。
 
+### 5.2 DPM-Solver——15 步就够了 (Lu et al., 2022)
+
+**动机**：EDM 的 Heun 采样器需要 35 步。能否更快？DPM-Solver 的关键观察：扩散 ODE 有**半线性结构**，可以精确求解线性部分，只对非线性部分做数值近似。
+
+**半线性结构**：
+$$\frac{d\mathbf{x}_t}{dt} = f(t)\mathbf{x}_t + \underbrace{\frac{g(t)^2}{2\sigma_t}\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t)}_{\text{非线性（网络）}}$$
+
+线性部分 $\frac{d\mathbf{x}}{dt} = f(t)\mathbf{x}$ 有解析解。通过**指数积分**分离线性项与非线性项：
 $$\mathbf{x}_s = \frac{\alpha_s}{\alpha_t}\mathbf{x}_t + \alpha_s\int_{\lambda_t}^{\lambda_s} e^{-\lambda}\,\hat{\boldsymbol{\epsilon}}_\theta(\hat{\mathbf{x}}_\lambda, \lambda)\,d\lambda$$
 
-其中 $\lambda_t = \log(\alpha_t/\sigma_t)$ 是对数 SNR。这使得 **15-20 步达到 1000 步的质量**。
+其中 $\lambda_t = \log(\alpha_t/\sigma_t)$。关键是：积分中的指数权重使我们可以用高阶近似（Taylor/Runge-Kutta）来估计积分，而不需要对整个 ODE 做高阶离散。
+
+**结果**：DPM-Solver-3（三阶）只需 **15-20 步**达到 DDPM 1000 步的质量，比 EDM 的 Heun 快一倍以上。
 
 **主线节点 5**：扩散 ODE 有可利用的数学结构（半线性、指数积分），专用求解器远超通用 ODE 求解器。
 
 ---
 
 ## 第六章：概率流范式——从去噪得分到向量场
+### 6.0 问题引入：扩散的弯路径
 
-### 6.1 Flow Matching (Lipman et al., 2023)
+回顾扩散模型的前向过程：$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon}$。从数据到噪声的路径是**弯曲的**——在空间中走的是弧线而非直线。弯曲有什么问题？两点：
+1. **采样步数多**：弯路径需要小步长才能用 Euler 方法精确跟踪，大跨步会偏离轨道。
+2. **训练信号不均匀**：不同 $t$ 处 SNR 变化速率不同（第三章），有些地方学得不充分。
 
-Flow Matching 是范式转移。它不再把扩散模型看作"SDE 的逆向"（§0.7），而是直接定义和回归**概率路径的向量场**（§0.8）。
+能否直接定义**直线路径**？从噪声直接滑到数据，没有弯绕？
 
-**核心对象**：目标向量场 $u_t(\mathbf{x})$，生成概率路径 $p_t(\mathbf{x})$：
-$$d\mathbf{x}_t = u_t(\mathbf{x}_t)\,dt$$
+> **注**：Flow Matching 时间约定与扩散相反——$t=0$ 是纯噪声，$t=1$ 是干净数据 $\mathbf{x}_0$。这是 FM 文献的标准写法。本节遵循此约定，但数据样本始终记为 $\mathbf{x}_0$。
 
-**问题**：$u_t$ 通常是未知的。Flow Matching 的关键技巧（类似 §0.5 中变分推断使用条件分布的思想）是用**条件向量场**来引导训练：
+### 6.1 Flow Matching——直接学习向量场 (Lipman et al., 2023)
 
-$$u_t(\mathbf{x}) = \int u_t(\mathbf{x}|\mathbf{x}_1)\,\frac{p_t(\mathbf{x}|\mathbf{x}_1)q(\mathbf{x}_1)}{p_t(\mathbf{x})}\,d\mathbf{x}_1$$
+**核心思想**：不再从 SDE 推导，而是直接定义一条从噪声（$t=0$）到数据 $\mathbf{x}_0$（$t=1$）的概率路径 $p_t(\mathbf{x})$。设 $u_t(\mathbf{x})$ 是驱动这条路径的**目标向量场**（真实的速度），$v_t^\theta(\mathbf{x})$ 是我们用网络去拟合它的**学习向量场**。关系：$u_t$ 是 ground truth（训练目标），$v_t^\theta$ 是网络的输出（预测值），类似 DDPM 中 $\boldsymbol{\epsilon}$（真实噪声）vs $\boldsymbol{\epsilon}_\theta$（预测噪声）。
+$$d\mathbf{x}_t = u_t(\mathbf{x}_t)\,dt, \quad \text{用 } v_t^\theta \text{ 逼近 } u_t$$
 
-**决定性定理**：条件目标与无条件目标有相同梯度：
-$$\nabla_\theta\mathcal{L}_{\text{FM}}(\theta) = \nabla_\theta\mathcal{L}_{\text{CFM}}(\theta)$$
+**关键问题**：$v_t$ 没有监督信号——我们不知道"正确的速度"是什么。
 
-条件 Flow Matching 损失——纯回归任务：
+**条件 Flow Matching 技巧**：
 
-$$\mathcal{L}_{\text{CFM}}(\theta) = \mathbb{E}_{t,q(\mathbf{x}_1),p_t(\mathbf{x}|\mathbf{x}_1)}\Big[\|v_\theta(\mathbf{x}, t) - u_t(\mathbf{x}|\mathbf{x}_1)\|^2\Big]$$
+关键障碍：总概率路径 $p_t(\mathbf{x})$ 和**总向量场** $u_t(\mathbf{x})$ 都是未知的（涉及对所有数据积分）。$u_t(\mathbf{x})$ 是驱动 $p_t(\mathbf{x})$ 演化的速度场——$d\mathbf{x} = u_t(\mathbf{x})dt$。它在 Flow Matching 中的角色等价于扩散模型中 PF-ODE 的漂移项 $[\mathbf{f} - \frac{1}{2}g^2\nabla\log p_t]$（§2.3）——两者都是"粒子该怎么走"的确定速度。区别在于：扩散先学得分 $\nabla\log p_t$，再组合成速度；FM 直接学这个速度。但如果我们限定在**一个样本**上，事情就简单了。
 
-**扩散路径是特例**。更重要的是，可以选择**最优传输 (OT) 路径**——利用 §0.3 将条件概率路径设计为直线：
+对某个具体训练样本 $\mathbf{x}_0$（一张真实图像），定义**条件概率路径** $p_t(\mathbf{x} \mid \mathbf{x}_0)$——
+在时间 $t$，给定终点是 $\mathbf{x}_0$，当前噪声样本 $\mathbf{x}$ 的概率分布。
+设条件高斯路径为 $p_t(\mathbf{x}\mid\mathbf{x}_0) = \mathcal{N}(\mathbf{x}; \mu_t(\mathbf{x}_0), \sigma_t^2\mathbf{I})$，则条件向量场的闭式解为：
+$$u_t(\mathbf{x}\mid\mathbf{x}_0) = \frac{d\mu_t}{dt} + \frac{d\sigma_t}{dt}\cdot\frac{\mathbf{x} - \mu_t}{\sigma_t}$$
+这个公式是通用的——给定均值和方差的导数，向量场直接写出。两个例子：
+- **扩散路径**（$\mu_t = \mathbf{x}_0$，$\sigma_t$ 递增）：$u_t = \frac{d\sigma_t}{dt}\cdot\frac{\mathbf{x} - \mathbf{x}_0}{\sigma_t}$——向量指向 $\mathbf{x}_0$，被方差变化率缩放
+- **OT 直线路径**（$\mu_t = t\mathbf{x}_0$，$\sigma_t = 1-t$）：$u_t = \mathbf{x}_0 - \frac{\mathbf{x} - t\mathbf{x}_0}{1-t} = \frac{\mathbf{x}_0 - \mathbf{x}}{1-t}$
 
-$$p_t(\mathbf{x}|\mathbf{x}_1) = \mathcal{N}(\mathbf{x}; t\mathbf{x}_1, (1-(1-\sigma_{\min})t)^2\mathbf{I})$$
+现在定义两个 Loss：
+- $\mathcal{L}_{\text{FM}}(\theta) = \mathbb{E}_{t,p_t(\mathbf{x})}\|v_\theta(\mathbf{x},t) - u_t(\mathbf{x})\|^2$——匹配未知的总向量场（无法直接算）
+- $\mathcal{L}_{\text{CFM}}(\theta) = \mathbb{E}_{t,q(\mathbf{x}_0),p_t(\mathbf{x}\mid\mathbf{x}_0)}\|v_\theta(\mathbf{x},t) - u_t(\mathbf{x}\mid\mathbf{x}_0)\|^2$——匹配条件向量场（可以算！）
 
-OT 路径是**直线**——比扩散路径更简单、训练更快、采样更高效。
+**核心定理**：两者的梯度相等——$\nabla_\theta\mathcal{L}_{\text{FM}} = \nabla_\theta\mathcal{L}_{\text{CFM}}$。
+这意味着**用条件路径训练等价于用总路径训练**，而条件路径的向量场 $u_t(\mathbf{x}\mid\mathbf{x}_0)$ 对每个样本都可以解析计算，训练变得可行。
 
-### 6.2 Rectified Flow (Liu et al., 2023)
+**扩散是特例**：如果选 $p_t(\mathbf{x}\mid\mathbf{x}_0) = \mathcal{N}(\mathbf{x}; \mathbf{x}_0, \sigma_t^2\mathbf{I})$（均值固定在 $\mathbf{x}_0$，方差随 $t$ 增大），条件向量场为 $u_t(\mathbf{x}\mid\mathbf{x}_0) = \frac{\mathbf{x}_0 - \mathbf{x}}{\sigma_t}\frac{d\sigma_t}{dt}$。代入 CFM Loss，等价于匹配得分 $\nabla\log p_t(\mathbf{x}\mid\mathbf{x}_0)$——退化为标准扩散的得分匹配。
 
-Rectified Flow 从另一个角度达到同一结论。给定 $X_0 \sim \pi_0$, $X_1 \sim \pi_1$，直接学习直线插值的向量场——利用 §0.3 和 §0.8：
+**OT 直线路径**：Flow Matching 的真正威力在于可以选更优的路径。最优传输路径直接走直线：
+$$p_t(\mathbf{x}\mid\mathbf{x}_0) = \mathcal{N}(\mathbf{x}; t\mathbf{x}_0, (1-t)^2\mathbf{I})$$
 
+**为什么叫"直线"**：条件均值 $\mu_t = t\mathbf{x}_0$ 在空间中沿直线从 $0$（$t=0$，噪声）均匀移动到 $\mathbf{x}_0$（$t=1$，数据）。每个样本的轨迹近乎笔直。
+
+**SNR 约束**：$\text{SNR}(t) = t^2/(1-t)^2$，满足端点条件 $\text{SNR}(0)=0$（纯噪声）、$\text{SNR}(1)\to\infty$（纯净数据）。第三章的 VLB 调度不变性对 FM 不直接适用——FM 没有 VLB，它直接回归向量场。但 SNR 端点约束的思想是一致的：只要路径从噪声走到数据，中间怎么走都行，直线是最短的。
+
+直线 = 最简单的向量场 = 训练更快、采样步数更少。
+
+#### 直觉对比：得分 vs 向量场
+
+得分 $\nabla\log p_t$ 本身就是一个向量场——它指向密度增长最快的方向。那为什么在 PF-ODE 中不直接用得分做漂移，而要写成 $[\mathbf{f} - \frac{1}{2}g^2\nabla\log p_t]$ 这个复杂形式？得分不就是天然的速度场吗？
+
+**核心原因：扩散不是自由运动，它处在 SDE 的"流"中。**
+
+类比：你在河中划船。得分 $\nabla\log p_t$ 告诉你"源头在哪个方向"——这就像一个指南针。但河水本身有流速 $\mathbf{f}$（正向漂移），把你往下游推。要回到源头，你需要做两件事：
+1. **对抗水流**：抵消正向漂移 $\mathbf{f}$（在逆向 ODE 中自然翻转方向）
+2. **朝源头划**：沿着 $-\nabla\log p_t$ 方向用力
+
+而 $-g^2$ 是"水流越急越用力划"的缩放——噪声大（$g$ 大）时，系统更随机，得分需要更强的纠正力。$\frac{1}{2}$ 来自 Fokker-Planck 方程中扩散项的系数（见 §2.3 的推导）。
+
+**PF-ODE 向量场 = 负的正向漂移 + 得分引导力**。得分是"方向"，但完整的"速度"还需要考虑反向抵消正向 SDE 的惯性。
+
+**Flow Matching 的洞察**：既然最终要的是这个组合速度，为什么不直接学 $u_t$ 本身？FM 选择**跳过得分分解**，直接在向量场空间做回归——这就是 FM 比扩散"更直接"的本质。
+
+### 6.2 Rectified Flow——让流越来越直 (Liu et al., 2023)
+
+**动机**：Flow Matching 的直线路径需要精心选择条件分布。Rectified Flow 给了一个更直接的配方：把数据对 $(X_0, X_1)$ 的线性插值当目标：
 $$X_t = tX_1 + (1-t)X_0$$
 
-训练——来自 §0.10 的 MSE 回归：
+训练极简——向量 $X_1-X_0$ 沿直线是常数，直接做回归：
 $$\min_v \mathbb{E}_{(X_0,X_1),t}\Big[\|(X_1 - X_0) - v(X_t, t)\|^2\Big]$$
 
-**Reflow** 是让流变直的关键机制：反复用前一次的流生成配对样本，再重新训练（利用 §0.9 的 push-forward 思想）。理论上保证：
-1. 每一步 Reflow 不增加任意凸代价下的传输代价
-2. 两步 Reflow 后流几乎完全直线
-3. 直线流只需 1 次 Euler 步（§0.8）即可精准模拟
+**Reflow——核心创新**：第一次训练的流通常还是弯的（因为随机配对 $X_0,X_1$ 会导致轨迹交叉）。Reflow 的做法：
+1. 用学到的流生成新配对 $(Z_0, Z_1)$——这些配对沿流是因果相关的
+2. 用新配对**重新训练**
+3. 重复——每次都更直
 
-### 6.3 扩散与流的统一视角 (SiT, Ma et al., 2024)
+理论上两步 Reflow 后流几乎完全直线，1 次 Euler 步即可精准模拟。就像用 GPS 反复优化路线——每次迭代都更接近最短路径。
 
-SiT 在**插值框架**下系统比较了两种范式——这个框架本身就是 §0.3 重参数化技巧的直接推广：
+### 6.3 统一视角：SiT 的实验结论 (Ma et al., 2024)
 
-$$\mathbf{x}_t = \alpha_t\mathbf{x}_* + \sigma_t\boldsymbol{\epsilon}$$
+SiT 在统一插值框架 $\mathbf{x}_t = \alpha_t\mathbf{x}_* + \sigma_t\boldsymbol{\epsilon}$ 下系统比较：
+- **预测噪声 $\epsilon$**：DDPM 传统，适合高 SNR
+- **预测 $\mathbf{x}_0$**：去噪目标，适合低 SNR
+- **$v$-prediction**：$v = \alpha_t\epsilon - \sigma_t\mathbf{x}_0$，统一两者
 
-| 预测目标 | 表达式 | 来源 |
-|---------|--------|------|
-| $\epsilon$ | 预测噪声 | DDPM (§1.2) |
-| $x_0$ | 预测干净数据 | EDM (§5.1) |
-| $v$ | $v = \alpha_t\epsilon - \sigma_t x_0$ | Salimans & Ho (2022) |
+**结论**：Flow Matching + $v$-prediction + ODE 采样在 ImageNet 上全面超越传统扩散。
 
-**结论**：Flow Matching + $v$-prediction + ODE 采样在 ImageNet 上全面超越扩散模型。
-
-#### 几何直观：概率路径的演化与直线流
+#### 几何直观
 
 ![概率路径](figures/fig-probability-path.png)
-
-从 $t=0$（标准高斯先验）到 $t=1$（双峰数据分布），概率密度平滑地变形。Flow Matching 的核心任务是学习一个向量场 $v_t$，使得沿着它移动的概率密度恰好按照这个路径演化。这就像**引导一滴墨水在流动的水中按照预定路径扩散**——$v_t$ 就是水流的速度场。
+概率密度从先验到数据平滑变形。Flow Matching 学习驱动这条变形的速度场。
 
 ![OT vs Diffusion](figures/fig-ot-vs-diffusion.png)
+扩散路径（左）弯曲，OT 路径（右）笔直。直线 = Euler 完美 = 少步精准。
 
-**左图（扩散路径）**：从先验（星形）到数据的路径是弯曲的。扩散过程天然倾向于走"弯路"，因为随机布朗运动不是最短路径。
-
-**右图（OT 直线路径）**：路径尽可能直——$\mathbf{x}_t = t\mathbf{x}_1 + (1-t)\mathbf{x}_0$。直线路径可以用**更少的离散化步数**精确模拟——欧拉方法对直线是精确的，但对曲线会产生累积误差。
-
-**传输代价的直观**：想象从 A 点开车到 B 点。扩散路径像在城市中绕行（弯弯曲曲），OT 路径像走高速公路（直线）。Reflow 就像不断用 GPS 优化路线——每次迭代都找到更直的路线。
-
-**主线节点 6**：从去噪得分 $\nabla\log p$ 到向量场 $v$ 是自然的进化。扩散是概率路径的特例，OT 直线路径是更优的选择。
+**主线节点 6**：扩散→Flow 是自然进化。直线路径训练更快、采样更少、效果更好。
 
 ---
 
 ## 第七章：一步生成——从 PF-ODE 到自洽性
 
-### Consistency Models (Song et al., 2023)
+### 7.0 问题引入：能不能一步到位？
 
-最终目标：让一步就够了。从 PF-ODE（§2.3）出发，使用 Karras 设置（§5.1）：
+第五章把采样从 1000 步压到 35 步（EDM）再到 15 步（DPM-Solver），第六章用直线流进一步降到个位数。但所有这些方法仍然需要**多步 ODE 求解**——每一步都要跑一遍网络。
 
-$$d\mathbf{x}_t = -\frac{1}{2}\sigma(t)^2\nabla_{\mathbf{x}}\log p_t(\mathbf{x}_t)\,dt$$
+能不能**一步生成**？从噪声开始，一次网络前向就输出干净图像？
 
-定义**一致性函数** $f(\mathbf{x}_t, t) \to \mathbf{x}_0$——利用 §0.4 中得分函数的思想，但直接映射到干净数据：
+### 7.1 Consistency Models——把 ODE 轨迹折叠成一个点 (Song et al., 2023)
 
-$$\forall t, t' \in [0, T]: \quad f(\mathbf{x}_t, t) = f(\mathbf{x}_{t'}, t') = \mathbf{x}_0$$
+**核心洞察**：PF-ODE 将 $\mathbf{x}_T$ 光滑地映射到 $\mathbf{x}_0$。如果训练一个网络，让它学习"从轨迹上任意一点直接跳回原点"，一步就够了。
 
-**蒸馏**（有预训练模型）——§0.8 的 ODE 求解器用于生成配对训练数据：
+**自洽性条件**：定义一致性函数 $f(\mathbf{x}_t, t) \to \mathbf{x}_0$，要求同一轨迹上任意两点映射到同一结果：
+$$\forall t, t': \quad f(\mathbf{x}_t, t) = f(\mathbf{x}_{t'}, t') = \mathbf{x}_0$$
 
-$$\mathcal{L} = \mathbb{E}\Big[d\big(f_\theta(\mathbf{x}_{t_{n+1}}, t_{n+1}),\; f_{\theta^-}(\hat{\mathbf{x}}_{t_n}, t_n)\big)\Big]$$
+**两种训练方式**：
+- **蒸馏**：用预训练扩散模型 + ODE solver 生成轨迹上的相邻点对，训练 $f$ 匹配它们的一致性
+- **独立训练**：不用预训练模型，直接用重参数化生成配对数据训练
 
-**独立训练**（从零开始）——利用 §0.3 的重参数化直接生成同一轨迹上的相邻点：
+**采样**：$\hat{\mathbf{x}}_0 = f_\theta(\mathbf{x}_T, T)$。极致简单。也可以多步精炼提升质量。
 
-$$\mathcal{L} = \mathbb{E}\Big[d\big(f_\theta(\mathbf{x}_0 + t_{n+1}\mathbf{z},\,t_{n+1}),\; f_{\theta^-}(\mathbf{x}_0 + t_n\mathbf{z},\,t_n)\big)\Big]$$
-
-采样极简：$\hat{\mathbf{x}}_0 = f_\theta(\mathbf{x}_T, T)$，一次网络前向。
-
-#### 几何直观：自洽性——轨迹上的所有点汇于同一原点
+#### 几何直观
 
 ![一致性模型](figures/fig-consistency-model.png)
+每条彩色曲线是 PF-ODE 轨迹。自洽性 = 曲线上所有点都映射到同一个星形 $\mathbf{x}_0$。训练时在小段轨迹上建立一致性，然后链式传播到全轨迹。
 
-图中展示了 5 条 PF-ODE 轨迹（彩色曲线）。**自洽性**的要求是：每条轨迹上的**所有点**都映射到同一个终点（星形标记的 $\mathbf{x}_0$）。
-
-高亮的品红色轨迹展示了关键洞察——标记为 $\mathbf{x}_2, \mathbf{x}_5, \mathbf{x}_8, \mathbf{x}_{11}, \mathbf{x}_{14}$ 的五个点被一致性函数 $f_\theta$ 映射到同一个 $\mathbf{x}_0$。训练时，通过在**相邻时间步**之间施加这种一致性来逐步学习：
-
-$$f_\theta(\mathbf{x}_{t_{n+1}}, t_{n+1}) \approx f_{\theta^-}(\mathbf{x}_{t_n}, t_n)$$
-
-从 $t_{n+1}$ 到 $t_n$ 的小步一致性一旦建立，就可以**链式传播**到全轨迹——$t_T$ 的点可以通过一连串中间点最终映射到 $t_0$。一次前向就够了。
-
-**物理类比**：一致性模型像**时间反演对称性**——给定粒子在任一时刻的位置，你都能推断出它的初始位置。就像看到一个弹道轨迹上的任意一点，就立刻知道发射点在哪里。
-
-**主线节点 7**：如果 PF-ODE 轨迹上的所有点映射到同一原点，那么从噪声到数据只需一步。这是扩散模型推理加速的极致。
+**主线节点 7**：PF-ODE 轨迹上的点映射到同一原点 → 一步生成。这是扩散推理加速的终点。
 
 ---
 
 ## 第八章：从 U-Net 到 Transformer——通往规模化之路
 
-### 8.1 DiT (Peebles & Xie, 2023)
+### 8.0 问题引入：U-Net 的瓶颈
+
+前七章所有扩散模型都基于 U-Net 架构（卷积 + 注意力）。U-Net 在图像生成上极其成功，但它有一个根本限制：**不像 Transformer 那样天然支持扩展律**。LLM 领域已经证明——更大的 Transformer = 更好的性能，几乎可以无限堆参数。扩散模型能不能也这么做？
+
+### 8.1 DiT——用 Transformer 替换 U-Net (Peebles & Xie, 2023)
+
+**核心思想**：把图像切成 Patches（像 ViT），送入纯 Transformer，用自适应层归一化注入时间和类别条件：
 
 $$\text{Image} \xrightarrow{\text{Patchify}} \text{Tokens} \xrightarrow{\text{Transformer Blocks + AdaLN}} \text{Denoised Patches}$$
 
-条件注入（adaLN-Zero）——利用类似 §0.2 中约束优化的思想，零初始化保证训练稳定性：
-
+**adaLN-Zero**：条件 $c$（时间步 + 类别嵌入）通过一个小 MLP 生成缩放参数 $\gamma(c)$ 和偏移参数 $\beta(c)$：
 $$\text{adaLN}(h, c) = \gamma(c) \cdot h + \beta(c), \quad \gamma_{\text{init}} = 0$$
 
-与 Transformer 语言模型相似，DiT 展示了**扩展律**：更大的模型→更低的 FID。
+初始化 $\gamma=0$ 使网络起步时退化为恒等映射，训练极其稳定。
 
-### 8.2 SD3 (Esser et al., 2024)
+**关键发现——扩展律**：更大的 DiT（更多参数、更多 FLOPs）→ FID 单调下降。扩散模型和 LLM 遵循同样的规律：**把模型做大就能更好**。
 
-SD3 将一切整合在一起——前七章的数学在此汇聚：
+### 8.2 SD3——八大章数学的集大成者 (Esser et al., 2024)
 
-$$\text{SD3} = \underbrace{\text{MM-DiT}}_{\text{§8.1 架构}} + \underbrace{\text{Rectified Flow}}_{\text{§6.2 直线路径}} + \underbrace{\text{大规模训练}}_{\text{§0.10 Monte Carlo 估计在亿级数据上}}$$
+SD3 不是新算法，而是将前七章的所有数学成果组合到一个 80 亿参数的模型里：
 
-MM-DiT 用分离的文本/图像注意力权重实现跨模态交互。训练使用 Rectified Flow 的直线路径和 ln-SNR 加权（§3.1）。
+- **架构**：MM-DiT——多模态 DiT，文本 token 和图像 token 用分离的注意力权重交互
+- **训练目标**：Rectified Flow（§6.2）直线路径 + $v$-prediction（§6.3）
+- **加权方案**：ln-SNR 权重（§3.1）
+- **采样**：确定性 ODE + CFG（§4.2）
 
-**核心经验**：Scaling Works。更大的模型在文本理解、视觉质量、拼写准确率上全面改善。
+$$\text{SD3} = \text{MM-DiT} + \text{Rectified Flow} + \text{大规模训练}$$
 
-**主线节点 8**：扩散模型的扩展律与 LLM 相似——Transformer 骨干 + 大规模训练 → 单调改善。
+**核心经验**：Scaling Works。80 亿参数模型在文本理解、视觉质量、拼写准确率上全面超越小模型。
+
+**主线节点 8**：扩散模型的扩展律 = Transformer 骨干 + 更大规模 → 单调改善——与 LLM 完全相同的范式。至此，本书的数学主线从 2015 年的离散马尔可夫链走到了 2024 年的 80 亿参数 Transformer。
 
 ---
 
