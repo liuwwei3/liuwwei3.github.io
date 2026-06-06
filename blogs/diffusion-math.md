@@ -49,8 +49,8 @@ title: Diffusion 模型的数学主线：从马尔可夫链到概率流
 | $\nabla_{\mathbf{x}}\log p_t(\mathbf{x})$ | **得分函数**（score function） | §2.2 |
 | $\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t)$ | 噪声预测网络 | §1.2 |
 | $\mathbf{s}_\theta(\mathbf{x}_t, t)$ | 得分网络 | §1.2 |
-| $D_\theta(\mathbf{x}; \sigma)$ | 去噪网络 | §5.1 |
-| $v_\theta(\mathbf{x}, t)$ | 向量场网络（Flow Matching） | §6.1 |
+| $D_\theta(\mathbf{x}; \sigma)$ | 去噪网络 | §3.1 |
+| $v_\theta(\mathbf{x}, t)$ | 向量场网络（Flow Matching） | §5.1 |
 
 ### 训练与损失
 
@@ -66,10 +66,10 @@ title: Diffusion 模型的数学主线：从马尔可夫链到概率流
 
 | 符号 | 含义 | 首次出现 |
 |------|------|---------|
-| $\phi_t: \mathbb{R}^d \to \mathbb{R}^d$ | 流映射（flow map） | §6.1 |
-| $u_t(\mathbf{x})$ | 目标向量场 | §6.1 |
-| $p_t(\mathbf{x})$ | 概率密度路径 | §6.1 |
-| $f_\theta(\mathbf{x}_t, t)$ | 一致性函数 | §7 |
+| $\phi_t: \mathbb{R}^d \to \mathbb{R}^d$ | 流映射（flow map） | §5.1 |
+| $u_t(\mathbf{x})$ | 目标向量场 | §5.1 |
+| $p_t(\mathbf{x})$ | 概率密度路径 | §5.1 |
+| $f_\theta(\mathbf{x}_t, t)$ | 一致性函数 | §6.1 |
 
 ---
 
@@ -992,61 +992,8 @@ image = vae.decode(latents)              # 潜空间→图像
 
 ---
 
-## 第五章：设计空间统一与快速采样
-
-### 5.0 问题引入：设计空间的混乱
-
-前四章建立了扩散模型的数学框架，但实践中留下了大量"怎么做"的问题：
-- 噪声调度用线性的还是余弦的？EDM 论文测试了六种，结论是什么？
-- 网络应该预测噪声 $\boldsymbol{\epsilon}$、去噪图像 $\mathbf{x}_0$、还是得分 $\mathbf{s}$？
-- 采样时 ODE 好还是 SDE 好？步长怎么选？
-- 训练时不同噪声水平的 Loss 权重怎么定？
-
-这些问题看似独立，实际都指向同一个诉求：**把设计空间理清楚，找出真正重要的自由度**。
-本章介绍两个里程碑工作——EDM 用 $\sigma$ 为轴统一了设计空间，DPM-Solver 用半线性结构将推理加速到极致。
-
-### 5.1 EDM——以噪声水平 $\sigma$ 为中心 (Karras et al., 2022)
-
-**核心思想**：扩散模型的所有设计选择（调度、预测目标、权重、采样器）都可以用**噪声标准差 $\sigma$** 这一个变量来表达。第三章告诉我们 SNR 的端点决定模型，EDM 进一步证明：**中间的一切也可以围绕 $\sigma$ 组织**。
-
-**统一 ODE**：将 PF-ODE 写成以 $\sigma$ 为自变量的最简形式：
-$$d\mathbf{x} = -\sigma\,\nabla_{\mathbf{x}}\log p(\mathbf{x};\sigma)\,d\sigma$$
-
-**从得分到去噪器**：实际训练中不直接预测得分，而是预测**去噪后的图像** $D_\theta(\mathbf{x};\sigma) \approx \mathbb{E}[\mathbf{x}_0 \mid \mathbf{x}_t=\mathbf{x}]$。得分与去噪器的关系：
-$$\nabla_{\mathbf{x}}\log p(\mathbf{x};\sigma) = \frac{D_\theta(\mathbf{x};\sigma) - \mathbf{x}}{\sigma^2}$$
-
-**Preconditioning（预条件）**：核心工程技巧。网络 $F_\theta$ 的输入输出被精心缩放，使得在所有噪声水平下训练信号均匀：
-$$D_\theta(\mathbf{x};\sigma) = c_{\text{skip}}(\sigma)\,\mathbf{x} + c_{\text{out}}(\sigma)F_\theta\big(c_{\text{in}}(\sigma)\,\mathbf{x};\,c_{\text{noise}}(\sigma)\big)$$
-
-$c_{\text{skip}}$ 让网络只需预测残差（而非完整图像），$c_{\text{in}}$ 保证输入方差为 1，$c_{\text{out}}$ 保证输出目标方差为 1。这大幅稳定了训练，使得同一个网络在不同 $\sigma$ 下都能有效学习。
-
-**训练目标**：等权重的去噪误差，用 $\sigma^2$ 归一化：
-$$\mathcal{L} = \mathbb{E}_{\sigma,\mathbf{x}_0,\mathbf{n}}\left[\frac{1}{\sigma^2}\|D_\theta(\mathbf{x}_0+\mathbf{n};\sigma) - \mathbf{x}_0\|^2\right]$$
-
-**Heun 二阶采样器**：EDM 推荐的采样器，35 步可达 1000 步质量。
-
-**贡献总结**：EDM 把扩散模型中"调参"的玄学变成了"选 $\sigma$ 调度"的科学。后续所有工作（DPM-Solver、Consistency Models）都建立在 EDM 的 $\sigma$ 参数化之上。
-
-### 5.2 DPM-Solver——15 步就够了 (Lu et al., 2022)
-
-**动机**：EDM 的 Heun 采样器需要 35 步。能否更快？DPM-Solver 的关键观察：扩散 ODE 有**半线性结构**，可以精确求解线性部分，只对非线性部分做数值近似。
-
-**半线性结构**：
-$$\frac{d\mathbf{x}_t}{dt} = f(t)\mathbf{x}_t + \underbrace{\frac{g(t)^2}{2\sigma_t}\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t)}_{\text{非线性（网络）}}$$
-
-线性部分 $\frac{d\mathbf{x}}{dt} = f(t)\mathbf{x}$ 有解析解。通过**指数积分**分离线性项与非线性项：
-$$\mathbf{x}_s = \frac{\alpha_s}{\alpha_t}\mathbf{x}_t + \alpha_s\int_{\lambda_t}^{\lambda_s} e^{-\lambda}\,\hat{\boldsymbol{\epsilon}}_\theta(\hat{\mathbf{x}}_\lambda, \lambda)\,d\lambda$$
-
-其中 $\lambda_t = \log(\alpha_t/\sigma_t)$。关键是：积分中的指数权重使我们可以用高阶近似（Taylor/Runge-Kutta）来估计积分，而不需要对整个 ODE 做高阶离散。
-
-**结果**：DPM-Solver-3（三阶）只需 **15-20 步**达到 DDPM 1000 步的质量，比 EDM 的 Heun 快一倍以上。
-
-**主线节点 5**：扩散 ODE 有可利用的数学结构（半线性、指数积分），专用求解器远超通用 ODE 求解器。
-
----
-
-## 第六章：概率流范式——从去噪得分到向量场
-### 6.0 问题引入：扩散的弯路径
+## 第五章：概率流范式——从去噪得分到向量场
+### 5.0 问题引入：扩散的弯路径
 
 回顾扩散模型的前向过程：$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\mathbf{x}_0 + \sqrt{1-\bar{\alpha}_t}\boldsymbol{\epsilon}$。从数据到噪声的路径是**弯曲的**——在空间中走的是弧线而非直线。弯曲有什么问题？两点：
 1. **采样步数多**：弯路径需要小步长才能用 Euler 方法精确跟踪，大跨步会偏离轨道。
@@ -1056,7 +1003,7 @@ $$\mathbf{x}_s = \frac{\alpha_s}{\alpha_t}\mathbf{x}_t + \alpha_s\int_{\lambda_t
 
 > **注**：Flow Matching 时间约定与扩散相反——$t=0$ 是纯噪声，$t=1$ 是干净数据 $\mathbf{x}_0$。这是 FM 文献的标准写法。本节遵循此约定，但数据样本始终记为 $\mathbf{x}_0$。
 
-### 6.1 Flow Matching——直接学习向量场 (Lipman et al., 2023)
+### 5.1 Flow Matching——直接学习向量场 (Lipman et al., 2023)
 
 **核心思想**：不再从 SDE 推导，而是直接定义一条从噪声（$t=0$）到数据 $\mathbf{x}_0$（$t=1$）的概率路径 $p_t(\mathbf{x})$。设 $u_t(\mathbf{x})$ 是驱动这条路径的**目标向量场**（真实的速度），$v_t^\theta(\mathbf{x})$ 是我们用网络去拟合它的**学习向量场**。关系：$u_t$ 是 ground truth（训练目标），$v_t^\theta$ 是网络的输出（预测值），类似 DDPM 中 $\boldsymbol{\epsilon}$（真实噪声）vs $\boldsymbol{\epsilon}_\theta$（预测噪声）。
 $$d\mathbf{x}_t = u_t(\mathbf{x}_t)\,dt, \quad \text{用 } v_t^\theta \text{ 逼近 } u_t$$
@@ -1095,21 +1042,24 @@ $$p_t(\mathbf{x}\mid\mathbf{x}_0) = \mathcal{N}(\mathbf{x}; t\mathbf{x}_0, (1-t)
 
 #### 直觉对比：得分 vs 向量场
 
-得分 $\nabla\log p_t$ 本身就是一个向量场——它指向密度增长最快的方向。那为什么在 PF-ODE 中不直接用得分做漂移，而要写成 $[\mathbf{f} - \frac{1}{2}g^2\nabla\log p_t]$ 这个复杂形式？得分不就是天然的速度场吗？
+得分 $\nabla\log p_t$ 指向密度增长最快的方向——它是概率密度 $p_t$ 的**空间**几何描述。
+但 PF-ODE 的漂移项 $[\mathbf{f} - \frac{1}{2}g^2\nabla\log p_t]$ 多出了 $\mathbf{f}$ 和 $g^2$。
+得分本身不就是天然的速度场吗？为什么不能直接用 $\nabla\log p_t$ 做漂移？
 
-**核心原因：扩散不是自由运动，它处在 SDE 的"流"中。**
+**核心原因：得分描述的是"密度在哪"，不是"粒子怎么动"。**
 
-类比：你在河中划船。得分 $\nabla\log p_t$ 告诉你"源头在哪个方向"——这就像一个指南针。但河水本身有流速 $\mathbf{f}$（正向漂移），把你往下游推。要回到源头，你需要做两件事：
-1. **对抗水流**：抵消正向漂移 $\mathbf{f}$（在逆向 ODE 中自然翻转方向）
-2. **朝源头划**：沿着 $-\nabla\log p_t$ 方向用力
+看前向 SDE：$d\mathbf{x} = \mathbf{f}dt + g d\mathbf{w}$。粒子在两个力驱动下运动——确定性的漂移 $\mathbf{f}$（人工设计的，推粒子朝噪声方向走）和随机扩散 $g d\mathbf{w}$（布朗运动，把粒子散布开来）。得分 $\nabla\log p_t$ 是 $p_t$ 密度的梯度——它告诉你**当前**状态下"哪里密度更高"，但**不包含粒子是如何到达当前状态的动力学信息**。换句话说：
+- 得分告诉你"数据源头在哪个方向"（密度往上走）
+- 但它不知道"水流 $\mathbf{f}$ 正把你往下游冲"（前向漂移）
 
-而 $-g^2$ 是"水流越急越用力划"的缩放——噪声大（$g$ 大）时，系统更随机，得分需要更强的纠正力。$\frac{1}{2}$ 来自 Fokker-Planck 方程中扩散项的系数（见 §2.3 的推导）。
+如果你只用 $-\nabla\log p_t$ 做逆向漂移（忽略 $\mathbf{f}$ 和 $g$），粒子会朝密度峰值走，但**不会沿时间反演的轨迹走**——你会得到一个新的概率流，其边缘分布不等于 $p_t$。
 
-**PF-ODE 向量场 = 负的正向漂移 + 得分引导力**。得分是"方向"，但完整的"速度"还需要考虑反向抵消正向 SDE 的惯性。
+**从 Fokker-Planck 方程看**：$p_t$ 的演化由 $\partial_t p = -\nabla\cdot(\mathbf{f}p) + \frac{1}{2}\nabla\cdot(g^2\nabla p)$ 描述。
+时间反演后（$t \to T-t$），这个方程要求漂移变为 $\mathbf{f} - g^2\nabla\log p_t$（逆 SDE）或 $\mathbf{f} - \frac{1}{2}g^2\nabla\log p_t$（PF-ODE，确定性）。两式中 $\mathbf{f}$ 和 $g$ 的出现是**强制性的**——它们来自正向 SDE 的物理过程，不是可选修饰。
 
-**Flow Matching 的洞察**：既然最终要的是这个组合速度，为什么不直接学 $u_t$ 本身？FM 选择**跳过得分分解**，直接在向量场空间做回归——这就是 FM 比扩散"更直接"的本质。
+**Flow Matching 的洞察**：既然 $\mathbf{f}$ 和 $g$ 是已知的（你设计的），得分是唯一需要学的量，整个 PF-ODE 漂移就是 $\mathbf{f}$、$g$、$\nabla\log p_t$ 的代数组合。FM 说：这个组合本身也是一个向量场 $u_t$，为什么不直接学它？FM 绕开了"分拆→分别建模→再组合"的过程，直接在向量场空间做端到端回归。
 
-### 6.2 Rectified Flow——让流越来越直 (Liu et al., 2023)
+### 5.2 Rectified Flow——让流越来越直 (Liu et al., 2023)
 
 **动机**：Flow Matching 的直线路径需要精心选择条件分布。Rectified Flow 给了一个更直接的配方：把数据对 $(X_0, X_1)$ 的线性插值当目标：
 $$X_t = tX_1 + (1-t)X_0$$
@@ -1124,7 +1074,7 @@ $$\min_v \mathbb{E}_{(X_0,X_1),t}\Big[\|(X_1 - X_0) - v(X_t, t)\|^2\Big]$$
 
 理论上两步 Reflow 后流几乎完全直线，1 次 Euler 步即可精准模拟。就像用 GPS 反复优化路线——每次迭代都更接近最短路径。
 
-### 6.3 统一视角：SiT 的实验结论 (Ma et al., 2024)
+### 5.3 统一视角：SiT 的实验结论 (Ma et al., 2024)
 
 SiT 在统一插值框架 $\mathbf{x}_t = \alpha_t\mathbf{x}_* + \sigma_t\boldsymbol{\epsilon}$ 下系统比较：
 - **预测噪声 $\epsilon$**：DDPM 传统，适合高 SNR
@@ -1141,65 +1091,150 @@ SiT 在统一插值框架 $\mathbf{x}_t = \alpha_t\mathbf{x}_* + \sigma_t\boldsy
 ![OT vs Diffusion](figures/fig-ot-vs-diffusion.png)
 扩散路径（左）弯曲，OT 路径（右）笔直。直线 = Euler 完美 = 少步精准。
 
-**主线节点 6**：扩散→Flow 是自然进化。直线路径训练更快、采样更少、效果更好。
+**主线节点 5**：扩散→Flow 是自然进化。直线路径训练更快、采样更少、效果更好。
 
 ---
 
-## 第七章：一步生成——从 PF-ODE 到自洽性
+## 第六章：一步生成——从 ODE 到自洽性
 
-### 7.0 问题引入：能不能一步到位？
+### 6.0 问题引入：能不能一步到位？
 
-第五章把采样从 1000 步压到 35 步（EDM）再到 15 步（DPM-Solver），第六章用直线流进一步降到个位数。但所有这些方法仍然需要**多步 ODE 求解**——每一步都要跑一遍网络。
+前面几章的方法——无论是扩散（§2.3 的 PF-ODE）还是 Flow Matching（§5.1 的直线 ODE）——都需要**多步 ODE 求解**，每一步都要跑一遍网络。能不能**一步生成**？从噪声开始，一次网络前向就输出干净图像？
 
-能不能**一步生成**？从噪声开始，一次网络前向就输出干净图像？
+### 6.1 Consistency Models——把 ODE 轨迹折叠成一个点 (Song et al., 2023)
 
-### 7.1 Consistency Models——把 ODE 轨迹折叠成一个点 (Song et al., 2023)
+**核心洞察**：任何 ODE（扩散的 PF-ODE 或 FM 的 Flow ODE）都将噪声 $\mathbf{x}_T$ 光滑地映射到数据 $\mathbf{x}_0$。关键观察：如果训练一个网络，让它学习"从轨迹上任意一点直接跳回原点"，一步就够了。这个思想**不依赖 ODE 的类型**——PF-ODE 还是 Flow ODE 只是具体的轨迹形状不同。
 
-**核心洞察**：PF-ODE 将 $\mathbf{x}_T$ 光滑地映射到 $\mathbf{x}_0$。如果训练一个网络，让它学习"从轨迹上任意一点直接跳回原点"，一步就够了。
-
-**自洽性条件**：定义一致性函数 $f(\mathbf{x}_t, t) \to \mathbf{x}_0$，要求同一轨迹上任意两点映射到同一结果：
+**自洽性条件**：定义一致性函数 $f(\mathbf{x}_t, t) \to \mathbf{x}_0$，要求同一 ODE 轨迹上任意两点映射到同一结果：
 $$\forall t, t': \quad f(\mathbf{x}_t, t) = f(\mathbf{x}_{t'}, t') = \mathbf{x}_0$$
 
 **两种训练方式**：
-- **蒸馏**：用预训练扩散模型 + ODE solver 生成轨迹上的相邻点对，训练 $f$ 匹配它们的一致性
-- **独立训练**：不用预训练模型，直接用重参数化生成配对数据训练
 
-**采样**：$\hat{\mathbf{x}}_0 = f_\theta(\mathbf{x}_T, T)$。极致简单。也可以多步精炼提升质量。
+| | 蒸馏 | 独立训练 |
+|---|---|---|
+| 需要预训练模型？ | 是 | 否 |
+| 训练数据来源 | 预训练模型 + ODE solver 生成相邻点对 | 重参数化直接生成 $\mathbf{x}_t = t\mathbf{x}_0 + (1-t)\boldsymbol{\epsilon}$ |
+| 对扩散适用？ | ✓ | ✓（用扩散的 $\alpha_t, \sigma_t$ 重参数化） |
+| 对 FM 适用？ | ✓ | ✓（FM 的直线路径天然适配重参数化） |
+
+**FM 下的独立训练尤其简单**：因为 $\mathbf{x}_t = t\mathbf{x}_0 + (1-t)\boldsymbol{\epsilon}$ 路径本身就是直线，相邻时间步 $\mathbf{x}_{t_n}$ 和 $\mathbf{x}_{t_{n+1}}$ 沿同一直线，不需要复杂的噪声调度转换。训练 Loss 为：
+$$\mathcal{L} = \mathbb{E}_{\mathbf{x}_0,\mathbf{z},n}\Big[d\big(f_\theta(\mathbf{x}_0 + t_{n+1}\mathbf{z},\,t_{n+1}),\; f_{\theta^-}(\mathbf{x}_0 + t_n\mathbf{z},\,t_n)\big)\Big]$$
+
+**采样**：$\hat{\mathbf{x}}_0 = f_\theta(\mathbf{x}_T, T)$，无论底层是扩散还是 FM——一次网络前向即可。也可以多步精炼提升质量。
 
 #### 几何直观
 
 ![一致性模型](figures/fig-consistency-model.png)
-每条彩色曲线是 PF-ODE 轨迹。自洽性 = 曲线上所有点都映射到同一个星形 $\mathbf{x}_0$。训练时在小段轨迹上建立一致性，然后链式传播到全轨迹。
+每条彩色曲线是 ODE 轨迹（可以是 PF-ODE 或 Flow ODE）。自洽性 = 曲线上所有点都映射到同一个星形 $\mathbf{x}_0$。小段一致性通过链式传播覆盖全轨迹。
 
-**主线节点 7**：PF-ODE 轨迹上的点映射到同一原点 → 一步生成。这是扩散推理加速的终点。
+**主线节点 6**：自洽性是 ODE 的通用性质——无论底层是扩散还是 FM，轨迹上所有点映射到同一原点，一步生成成为可能。
 
 ---
 
-## 第八章：从 U-Net 到 Transformer——通往规模化之路
+## 第七章：从 U-Net 到 Transformer——通往规模化之路
 
-### 8.0 问题引入：U-Net 的瓶颈
+### 7.0 问题引入：U-Net 的瓶颈
 
-前七章所有扩散模型都基于 U-Net 架构（卷积 + 注意力）。U-Net 在图像生成上极其成功，但它有一个根本限制：**不像 Transformer 那样天然支持扩展律**。LLM 领域已经证明——更大的 Transformer = 更好的性能，几乎可以无限堆参数。扩散模型能不能也这么做？
+前面各章的所有模型都基于 U-Net：一个编码器-解码器结构，用卷积提取特征，用跳跃连接保留细节。但 LLM 领域已经证明——Transformer + 更大规模 = 更好的性能。而 U-Net 不像 Transformer 那样天然可无限堆叠：卷积感受野有限、跳跃连接固定了分辨率层级、没有统一的 token 接口。本章讲两件事：**DiT 把 U-Net 换成 Transformer**，**SD3 把全书数学整合到一个 80 亿参数模型**。
 
-### 8.1 DiT——用 Transformer 替换 U-Net (Peebles & Xie, 2023)
+### 7.1 DiT——用 Transformer 做扩散 (Peebles & Xie, 2023)
 
-**核心思想**：把图像切成 Patches（像 ViT），送入纯 Transformer，用自适应层归一化注入时间和类别条件：
+#### 从 U-Net 到 DiT 的思维过程
 
-$$\text{Image} \xrightarrow{\text{Patchify}} \text{Tokens} \xrightarrow{\text{Transformer Blocks + AdaLN}} \text{Denoised Patches}$$
+回顾 §1.2 的 DDPM 训练：网络输入是噪声图像 $\mathbf{x}_t$ 和时间步 $t$，输出是预测噪声。网络需要知道两件事：图像的结构（**空间信息**）和当前噪声水平（**时间条件**）。U-Net 用卷积处理空间、用广播注入时间。DiT 换了一种思路：把图像当成 token 序列（像 ViT），把时间条件融入 Transformer 的每一层。
 
-**adaLN-Zero**：条件 $c$（时间步 + 类别嵌入）通过一个小 MLP 生成缩放参数 $\gamma(c)$ 和偏移参数 $\beta(c)$：
-$$\text{adaLN}(h, c) = \gamma(c) \cdot h + \beta(c), \quad \gamma_{\text{init}} = 0$$
+#### U-Net 的骨架（简化代码）
 
-初始化 $\gamma=0$ 使网络起步时退化为恒等映射，训练极其稳定。
+```python
+class UNetBlock(nn.Module):
+    def forward(self, x, t_emb):
+        h = self.conv1(x)
+        h = h + self.time_proj(t_emb)[:, :, None, None]  # 时间条件广播到所有空间位置
+        h = F.relu(h)
+        return h
+```
 
-**关键发现——扩展律**：更大的 DiT（更多参数、更多 FLOPs）→ FID 单调下降。扩散模型和 LLM 遵循同样的规律：**把模型做大就能更好**。
+时间嵌入为什么要广播到每个空间位置？因为噪声是在整个图像上**均匀**添加的——$t$ 时刻每个像素被同等程度的噪声污染。所以网络在每个位置都需要知道"现在是第几步"来决定去噪力度。广播是最简单的实现方式。
 
-### 8.2 SD3——八大章数学的集大成者 (Esser et al., 2024)
+#### DiT 的骨架（简化代码）
 
-SD3 不是新算法，而是将前七章的所有数学成果组合到一个 80 亿参数的模型里：
+**DiT 的做法**（Patchify + Transformer + AdaLN）：
+
+```python
+class DiTBlock(nn.Module):
+    def __init__(self, dim, num_heads):
+        self.norm1 = nn.LayerNorm(dim, elementwise_affine=False)  # 不做自带缩放
+        self.attn  = nn.MultiheadAttention(dim, num_heads)
+        self.norm2 = nn.LayerNorm(dim, elementwise_affine=False)
+        self.mlp   = nn.Sequential(nn.Linear(dim, 4*dim), nn.GELU(), nn.Linear(4*dim, dim))
+        self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(cond_dim, 6*dim))
+
+    def forward(self, x, c):
+        # c 是条件向量（时间步+类别嵌入），通过 MLP 生成 6 组参数
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = \
+            self.adaLN_modulation(c).chunk(6, dim=1) 
+
+        # Self-Attention with AdaLN
+        x = x + gate_msa * self.attn(
+            self.norm1(x) * (1 + scale_msa) + shift_msa
+        )
+        # MLP with AdaLN
+        x = x + gate_mlp * self.mlp(
+            self.norm2(x) * (1 + scale_mlp) + shift_mlp
+        )
+        return x
+```
+
+核心差异：U-Net 用卷积 + 时间广播注入条件；DiT 把图像当 token 序列，用 AdaLN 注入条件。
+
+**六组参数的含义**：`adaLN_modulation(c)` 从条件向量生成 6 组向量，每组维度 = token 维度。三对参数分别作用于 Self-Attention 和 MLP 两个子层：
+
+| 参数 | 子层 | 作用 | 直观理解 |
+|------|------|------|---------|
+| `shift_msa` / `shift_mlp` | Attention / MLP | 偏移归一化后的特征 | 调"基准线" |
+| `scale_msa` / `scale_mlp` | Attention / MLP | 缩放归一化后的特征 | 调"音量" |
+| `gate_msa` / `gate_mlp` | Attention / MLP | 门控整个子层的输出 | 调"开关"——0=跳过该子层，1=正常通过 |
+
+门控（gate）是关键创新：如果某个噪声水平不需要 attention 或 MLP 的处理，gate 可以接近 0，网络自动跳过该子层。
+
+#### AdaLN 是什么？为什么需要它？
+
+标准 Transformer 没有内置的"条件注入"机制。AdaLN（Adaptive Layer Normalization）是让 Transformer **感知条件（时间步、文本、类别）** 的方法。
+
+数学形式：
+$$\text{AdaLN}(\mathbf{h}, \mathbf{c}) = \boldsymbol{\gamma}(\mathbf{c}) \odot \frac{\mathbf{h} - \mu}{\sigma} + \boldsymbol{\beta}(\mathbf{c})$$
+
+其中 $\mathbf{c}$ 是条件向量（时间嵌入 + 文本嵌入拼接），通过一个小 MLP 映射出两个向量：
+- **$\boldsymbol{\gamma}(\mathbf{c})$（scale / 缩放）**：逐元素缩放归一化后的特征，控制每个维度的"音量"
+- **$\boldsymbol{\beta}(\mathbf{c})$（shift / 偏移）**：逐元素平移归一化后的特征，控制每个维度的"基准线"
+
+**几何意义**：LayerNorm 把特征压缩到零均值单位方差的球面附近。$\boldsymbol{\gamma}$ 和 $\boldsymbol{\beta}$ 在这个球面上做**仿射变换**——$\boldsymbol{\gamma}$ 拉伸/压缩不同方向（改变各维度的相对重要性），$\boldsymbol{\beta}$ 平移原点（改变各维度的基准值）。条件不同，拉伸方向和偏移量就不同——网络通过不同的 $\boldsymbol{\gamma},\boldsymbol{\beta}$ 表达不同的噪声水平/文本语义。
+
+实际代码中常写成 $\mathbf{h}' = \boldsymbol{\gamma} \odot \text{LN}(\mathbf{h}) + \boldsymbol{\beta}$ 或等价的 $\mathbf{h}' = \text{LN}(\mathbf{h}) \cdot (1+\boldsymbol{\gamma}) + \boldsymbol{\beta}$.
+
+
+
+#### AdaLN-Zero 是什么？
+
+**AdaLN-Zero** 是 DiT 论文中的初始化技巧：将 $\boldsymbol{\gamma}$ 的初始值设为零，这样训练开始时 AdaLN 退化为 $\mathbf{h}' = \text{LN}(\mathbf{h})$（即恒等变换 + LayerNorm）。网络的每个 block 起步时不做任何条件调整——就像一个普通 Transformer。随着训练进行，$\boldsymbol{\gamma}$ 逐步偏离零，网络逐步"学会"利用条件信息。
+
+**为什么这样好？** 类似于 ResNet 的残差思想——"先学会恒等，再学偏差"。如果初始化时有随机条件偏转，网络需要在学习的早期阶段同时解决"怎么去噪"和"条件信号怎么用"两个问题，容易不稳定。Zero-init 把这两个问题解耦了。
+
+**关键发现——扩展律**：实验表明，DiT 参数越多 → FID 越低。FID（Fréchet Inception Distance）是图像生成的"考试分数"——越小越好，度量生成图像与真实图像在特征空间的分布距离。单调下降证明扩散模型也遵循和 LLM 相同的扩展律：**把模型做大就能更好**，不需要改架构或算法。
+
+#### DIT只是换了一种网络结构预测得分/向量场，不影响其数学部分
+- **§1.2（DDPM 训练）**：DiT 的训练目标和 Loss 与 DDPM 完全相同——$\mathcal{L} = \|\boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\theta\|^2$。换架构不换 Loss
+- **§2.3（PF-ODE）**：DiT 的去噪网络驱动 ODE 采样——得分 $\to$ 噪声预测 $\to$ ODE 步进——逻辑链贯穿
+- **§4.2（CFG）**：DiT 的条件注入（adaLN）天然支持 CFG。CFG 需要同时跑条件和无条件两个预测。在 DiT 中，无条件只需把条件向量 $\mathbf{c}$ 置为零向量——`adaLN_modulation(zero)` 自动生成全零的 shift/scale/gate，网络退化为无条件的去噪器。不需要像 U-Net 那样额外维护一个无条件分支或做条件 dropout——零初始化天然就是无条件路径。
+- **§5.1（Flow Matching）**：DiT 作为骨干同时适用于扩散和 FM——后文的 SD3 就是 DiT + Rectified Flow 的组合
+
+
+### 7.2 SD3——前面数学的集大成者 (Esser et al., 2024)
+
+SD3（Stable Diffusion 3）是 Stability AI 在 2024 年发布的大规模文生图模型（80 亿参数），将本书前几章的核心思想整合到一个模型中：
 
 - **架构**：MM-DiT——多模态 DiT，文本 token 和图像 token 用分离的注意力权重交互
-- **训练目标**：Rectified Flow（§6.2）直线路径 + $v$-prediction（§6.3）
+- **训练目标**：Rectified Flow（§5.2）直线路径 + $v$-prediction（§5.3）
 - **加权方案**：ln-SNR 权重（§3.1）
 - **采样**：确定性 ODE + CFG（§4.2）
 
@@ -1207,7 +1242,36 @@ $$\text{SD3} = \text{MM-DiT} + \text{Rectified Flow} + \text{大规模训练}$$
 
 **核心经验**：Scaling Works。80 亿参数模型在文本理解、视觉质量、拼写准确率上全面超越小模型。
 
-**主线节点 8**：扩散模型的扩展律 = Transformer 骨干 + 更大规模 → 单调改善——与 LLM 完全相同的范式。至此，本书的数学主线从 2015 年的离散马尔可夫链走到了 2024 年的 80 亿参数 Transformer。
+**SD3 核心推理代码**（基于 HuggingFace Diffusers 官方实现，精简版）：
+
+```python
+from diffusers import StableDiffusion3Pipeline
+pipe = StableDiffusion3Pipeline.from_pretrained(
+    "stabilityai/stable-diffusion-3-medium-diffusers"
+)
+image = pipe("a cat", num_inference_steps=28, guidance_scale=7.0).images[0]
+```
+
+如果想理解内部，SD3 的采样循环本质上是：
+
+```python
+# 伪代码：SD3 采样循环（Rectified Flow + CFG）
+latents = torch.randn(1, 16, H//8, W//8)
+pos_emb = pipe.transformer.pos_embed         # MM-DiT 位置编码
+text_emb = pipe.encode_prompt("a cat")       # 文本编码
+
+for t in pipe.scheduler.timesteps:
+    # CFG：条件 + 无条件预测
+    eps_cond   = pipe.transformer(latents, t, text_emb, pos_emb)
+    eps_uncond = pipe.transformer(latents, t, null_emb, pos_emb)
+    eps = eps_uncond + guidance_scale * (eps_cond - eps_uncond)
+    # Rectified Flow 步进
+    latents = pipe.scheduler.step(eps, t, latents)
+
+image = pipe.vae.decode(latents)
+```
+
+关键点：`pipe.transformer` 就是 MM-DiT——文本和图像 token 在同一个 Transformer 中通过分离的注意力权重交互。采样循环中 CFG 和 Rectified Flow 步进各占一行，正是本书 §4.2 和 §5.2 的直接实现。
 
 ---
 
@@ -1225,7 +1289,7 @@ $$d\mathbf{x} = \underbrace{\big[\mathbf{f}(\mathbf{x},t) - \frac{1}{2}g(t)^2\na
 
 $$\nabla_{\mathbf{x}}\log p(\mathbf{x};\sigma) = \frac{D_\theta(\mathbf{x};\sigma) - \mathbf{x}}{\sigma^2}$$
 
-### 阶段 III：概率流 / 向量场 (2023-2025)
+### 阶段 III：概率流 / 向量场 / 一步生成 (2023-2025)
 
 $$\min_{v} \mathbb{E}_{(X_0, X_1), t}\Big[\|(X_1 - X_0) - v_\theta(X_t, t)\|^2\Big]$$
 
