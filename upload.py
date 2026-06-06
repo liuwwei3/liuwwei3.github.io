@@ -44,6 +44,16 @@ def chinese_count(text: str) -> int:
     return total
 
 
+def english_word_count(text: str) -> int:
+    """Count sequences of ASCII letters as English words."""
+    return len(re.findall(r'[a-zA-Z]+', text))
+
+
+def total_word_count(text: str) -> int:
+    """Combined count: Chinese characters + English words."""
+    return chinese_count(text) + english_word_count(text)
+
+
 def format_wc(count: int) -> str:
     return f"约 {count / 10000:.1f} 万字"
 
@@ -373,10 +383,10 @@ def main():
     # Build final article
     article = build_article(article_body, title)
 
-    # Count Chinese chars (on body only, excluding frontmatter)
+    # Count Chinese chars + English words (on body only, excluding frontmatter)
     body_only = article.split('---\n', 2)[-1] if article.startswith('---\n') else article
     body_only = strip_fences(body_only)
-    cc = chinese_count(body_only)
+    cc = total_word_count(body_only)
     wc_display = format_wc(cc)
 
     # Entry line for README
@@ -404,7 +414,7 @@ def main():
         "status": "success" if not args.dry_run else "dry_run",
         "title": title,
         "filename": filename,
-        "chinese_chars": cc,
+        "word_count": cc,
         "word_count_display": wc_display,
         "entry_line": entry,
         "commit_hash": commit_hash,
