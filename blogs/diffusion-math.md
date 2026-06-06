@@ -412,7 +412,7 @@ $$\frac{d}{dt}\phi_t(\mathbf{x}) = v(\phi_t(\mathbf{x}), t), \quad \phi_0(\mathb
 ![ODE流与向量场](figures/fig-ode-flow.png)
 
 - **左图**：每个箭头是向量场 $v(\mathbf{x})$ 在某点的方向和大小。从任意点出发，沿箭头连续移动形成积分曲线（品红），这就是 $\phi_t$ 的轨迹。中心不动点是 $v = 0$ 处。
-- **右图**：Euler 方法用折线逼近光滑曲线。步长越大误差越大——但 ODE 的确定性允许高阶方法（DPM-Solver）用大得多的步长。
+- **右图**：Euler 方法用折线逼近光滑曲线。步长越大误差越大——但 ODE 的确定性允许高阶方法（如 Runge-Kutta）用大得多的步长达到同样精度。
 
 > **直觉**：ODE 流就像**天气预报的风场图**——每点有确定的风向风速。叶子放在任意位置都会沿积分曲线飞行。
 
@@ -431,7 +431,7 @@ $$d\mathbf{x} = -\left[\mathbf{f}(\mathbf{x}, t) - \frac{1}{2}g(t)^2\nabla_{\mat
 
 Euler 方法——最基本的 ODE 步进：
 $$\mathbf{x}_{t-\Delta t} \approx \mathbf{x}_t - h(\mathbf{x}_t, t) \cdot \Delta t$$
-其中 $h$ 是 ODE 右端函数（即 $v$ 或 PF-ODE 的 $[\mathbf{f} - \frac{1}{2}g^2\nabla\log p_t]$）。高阶方法（Heun、RK4）使用更多中间评估换精度，是 DPM-Solver 和 EDM 的基础。
+其中 $h$ 是 ODE 右端函数（即 $v$ 或 PF-ODE 的 $[\mathbf{f} - \frac{1}{2}g^2\nabla\log p_t]$）。高阶方法（Heun、RK4）使用更多中间评估换取更高精度。
 
 ### 0.9 变量替换与 Push-forward
 
@@ -785,7 +785,7 @@ $$d\mathbf{x} = \left[\mathbf{f}(\mathbf{x}, t) - \frac{1}{2}g(t)^2\nabla_{\math
 以 VP-SDE 为例，其 PF-ODE 为：
 $$d\mathbf{x} = \left[-\frac{1}{2}\beta(t)\mathbf{x} - \frac{1}{2}\beta(t)\nabla_{\mathbf{x}}\log p_t(\mathbf{x})\right]dt$$
 
-训练完 $\boldsymbol{\epsilon}_\theta$ 后，代入 $\nabla\log p_t = -\boldsymbol{\epsilon}_\theta/\sqrt{1-\bar{\alpha}(t)}$，OD 变成纯网络驱动的确定动力学——这就是 DPM-Solver 和 DDIM 的数学基础。
+训练完 $\boldsymbol{\epsilon}_\theta$ 后，代入 $\nabla\log p_t = -\boldsymbol{\epsilon}_\theta/\sqrt{1-\bar{\alpha}(t)}$，ODE 变成纯网络驱动的确定动力学——这就是 DDIM 和所有 ODE 采样器的数学基础。
 
 ---
 
@@ -990,6 +990,8 @@ image = vae.decode(latents)              # 潜空间→图像
 
 **峰值偏移的意义**：$w=3/5$ 时峰值略偏向条件模式一侧（不是完全在模式正上方），这是因为引导力在得分空间是加法，在分布空间会压缩方差同时微调均值位置。
 
+**主线节点 4**：引导是得分空间的线性外推（贝叶斯规则 + 放大系数 $w$），不需要重新训练模型，只需修改采样过程。CFG 以一行的代码复杂度实现了条件生成能力，成为所有现代文生图系统的标配。
+
 ---
 
 ## 第五章：概率流范式——从去噪得分到向量场
@@ -1099,7 +1101,9 @@ SiT 在统一插值框架 $\mathbf{x}_t = \alpha_t\mathbf{x}_* + \sigma_t\boldsy
 
 ### 6.0 问题引入：能不能一步到位？
 
-前面几章的方法——无论是扩散（§2.3 的 PF-ODE）还是 Flow Matching（§5.1 的直线 ODE）——都需要**多步 ODE 求解**，每一步都要跑一遍网络。能不能**一步生成**？从噪声开始，一次网络前向就输出干净图像？
+回顾进度条：DDPM 需要 1000 步（§1.2），DDIM 压到 50-100 步（§2.1），Flow Matching 的直线路径进一步降到个位数（§5.2）。但所有这些方法仍然需要**多步 ODE 求解**——每一步都要跑一遍完整的网络前向。对于实时应用（视频生成、交互式编辑），这仍然太慢。
+
+能不能**一步生成**？从噪声开始，**一次网络前向**就输出干净图像？如果这能实现，扩散模型将拥有和 GAN 一样的推理速度，同时保持扩散的生成质量和多样性。
 
 ### 6.1 Consistency Models——把 ODE 轨迹折叠成一个点 (Song et al., 2023)
 
