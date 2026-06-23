@@ -623,57 +623,108 @@ LeCun 的 JEPA 白皮书说"不要在像素空间中预测"。但在 JEPA 尚未
 
 ### 3.1 DreamerV3：一个世界模型统治 150+ 个任务
 
+在深入 DreamerV3 的架构之前，先解决一个将在本节反复出现的计算问题：**不同任务的奖励数值可能在完全不同的数量级上。** Atari 游戏的奖励范围是 $[-1, +1]$，而 DMLab 的 3D 导航任务奖励可达 $10^3$ 甚至更高。如果用同一个网络直接回归这些原始数值，大奖励会产生巨大的梯度，淹没小奖励任务的训练信号。
+
+DreamerV3 的解决方案是把**所有回归问题都搬到一个"压缩"空间里做**。它定义了两个互逆的变换函数：
+
+$$\text{symlog}(x) = \text{sign}(x) \cdot \ln(|x| + 1)$$
+
+$$\text{symexp}(x) = \text{sign}(x) \cdot (\exp(|x|) - 1)$$
+
+**symlog 的作用（以 Atari $\pm 1$ vs DMLab $1000$ 为例）：**
+- symlog: $1 \mapsto 0.69$, $1000 \mapsto 6.91$ → 把跨越三个数量级的值压缩到同一小区间
+- symexp: $0.69 \mapsto 1$, $6.91 \mapsto 1000$ → 还原（只在需要输出真实值时使用）
+
+对绝对值小于 1 的值，$\ln(|x|+1) \approx |x|$，所以 symlog 是**近似线性的**——常用范围内的精度不会牺牲。DreamerV3 在所有回归任务中统一使用 symlog 空间：解码器在 symlog 空间中预测像素值、奖励预测器在 symlog 空间中预测 $\hat{r}_t$、Critic 在 symlog 空间中预测价值。网络的预测值通过 symexp 恢复到原始空间，但**损失函数和梯度始终在 symlog 空间中计算**。这意味着不管原始奖励是 1 还是 1000，它们在损失函数中的贡献是量级相近的。
+
+有了这个工具，现在来看 DreamerV3 的完整架构。
+
+---
+
 **架构：Recurrent State-Space Model (RSSM)。**
 
-DreamerV3 的世界模型由五个组件组成，端到端训练：
+DreamerV3 的世界模型继承了 DreamerV1/V2 的 RSSM 架构，由五个子网络组成，所有参数统记为 $\phi$，端到端联合训练：
 
-| 组件 | 公式 | 作用 |
-|------|------|------|
-| **编码器** | $\mathbf{z}_t \sim q_\phi(\mathbf{z}_t \mid \mathbf{h}_t, \mathbf{x}_t)$ | 从当前观测 $\mathbf{x}_t$ 和隐藏状态 $\mathbf{h}_t$ 中提取**随机潜变量** $\mathbf{z}_t$（32 个 32 类的分类分布），捕捉视觉细节 |
-| **序列模型** | $\mathbf{h}_t = f_\phi(\mathbf{h}_{t-1}, \mathbf{z}_{t-1}, \mathbf{a}_{t-1})$ | **GRU** 确定性路径：将上一时刻的隐藏状态、随机潜变量和动作整合为新的隐藏状态 $\mathbf{h}_t$，承载时序记忆 |
-| **动态预测器** | $\hat{\mathbf{z}}_t \sim p_\phi(\hat{\mathbf{z}}_t \mid \mathbf{h}_t)$ | **"闭眼预测"**——仅从 $\mathbf{h}_t$ 预测下一时刻的潜变量 $\hat{\mathbf{z}}_t$，不依赖真实观测。训练时与编码器的 $\mathbf{z}_t$ 对比（KL 损失），想象时替代真实编码器 |
-| **解码器** | $\hat{\mathbf{x}}_t = p_\phi(\hat{\mathbf{x}}_t \mid \mathbf{h}_t, \mathbf{z}_t)$ | 从 $(\mathbf{h}_t, \mathbf{z}_t)$ 重建原始观测，用作**训练信号**（迫使潜变量保留视觉信息） |
-| **奖励/继续预测器** | $\hat{r}_t, \hat{c}_t = p_\phi(\cdot \mid \mathbf{h}_t, \mathbf{z}_t)$ | 预测即时奖励和 episode 是否终止。均在 symlog 空间中预测（见下文创新 1） |
+| 组件 | 公式 | 输入 → 输出 | 作用 |
+|------|------|-----------|------|
+| **编码器** | $\mathbf{z}_t \sim q_\phi(\mathbf{z}_t \mid \mathbf{h}_t, \mathbf{x}_t)$ | 当前观测 $\mathbf{x}_t$ + 隐藏状态 $\mathbf{h}_t$ → 随机潜变量 $\mathbf{z}_t$ | 从像素中提取视觉信息。$\mathbf{z}_t$ 是**32 个独立的 32 类分类分布**（而非高斯），可自然处理多模态场景 |
+| **序列模型** | $\mathbf{h}_t = f_\phi(\mathbf{h}_{t-1}, \mathbf{z}_{t-1}, \mathbf{a}_{t-1})$ | 上一步隐藏状态 $\mathbf{h}_{t-1}$ + 上一步潜变量 $\mathbf{z}_{t-1}$ + 上一步动作 $\mathbf{a}_{t-1}$ → 当前隐藏状态 $\mathbf{h}_t$ | **确定性时序记忆**（GRU）。$\mathbf{h}_t$ 承载速度、加速度、方向等无法从单帧推断的信息 |
+| **动态预测器** | $\hat{\mathbf{z}}_t \sim p_\phi(\hat{\mathbf{z}}_t \mid \mathbf{h}_t)$ | 仅从 $\mathbf{h}_t$ 预测 $\hat{\mathbf{z}}_t$ | **"闭眼预测"**——不看真实观测，仅凭历史记忆猜测下一秒的视觉状态。想象 rollout 时**替代编码器**使用 |
+| **解码器** | $\hat{\mathbf{x}}_t = p_\phi(\hat{\mathbf{x}}_t \mid \mathbf{h}_t, \mathbf{z}_t)$ | 状态 $(\mathbf{h}_t, \mathbf{z}_t)$ → 观测重建 $\hat{\mathbf{x}}_t$ | 在 symlog 空间中重建输入图像，产生的梯度迫使 $\mathbf{z}_t$ 保留足够视觉信息 |
+| **奖励/继续预测器** | $\hat{r}_t, \hat{c}_t = p_\phi(\cdot \mid \mathbf{h}_t, \mathbf{z}_t)$ | 状态 $(\mathbf{h}_t, \mathbf{z}_t)$ → 奖励预测 $\hat{r}_t$ + 终止概率 $\hat{c}_t$ | 均在 symlog 空间中预测 |
 
-其中 $\phi$ 统指世界模型的所有参数。
+其中，我们把 RSSM 的完整状态记为 $\mathbf{s}_t = \{\mathbf{h}_t, \mathbf{z}_t\}$（符号表 §1.1 中已定义），它包含了世界模型在时刻 $t$ 对环境的全部知识——确定性记忆 $\mathbf{h}_t$（"之前发生了什么"）和随机视觉快照 $\mathbf{z}_t$（"画面上有什么"）。Actor 和 Critic 都只消费 $\mathbf{s}_t$，不直接接触像素。
 
-**Actor-Critic 背景简介。** 在现代强化学习中，Actor 和 Critic 是两个协同训练的神经网络，共同解决"如何将奖励信号转化为更好的动作"这个问题：
+---
 
-- **Actor（策略网络）**：输入状态 $\mathbf{s}_t$，输出动作 $\mathbf{a}_t$。**它的职责是决定"做什么"**——在当前位置，方向盘该打多少度。
-- **Critic（价值网络）**：输入状态 $\mathbf{s}_t$，输出对该状态的"价值"估计 $v(\mathbf{s}_t)$——即从这个状态出发，按照当前策略期望能获得的累计奖励。**它的职责是判断"这个位置有多好"**。
-- **协同机制**：Actor 做出动作，Critic 评估这个动作的结果有多好。Actor 用 Critic 的输出作为基准线（baseline）来降低梯度方差——如果某个动作的回报比 Critic 预测的更好，就提高该动作的概率；如果更差，就降低。这被称为 **REINFORCE with baseline** 或 **Advantage Actor-Critic (A2C)**。
+**世界模型的训练：KL 平衡与自由比特。**
 
-**DreamerV3 的 Actor 和 Critic 完全在想象中训练——不接触任何真实环境数据。** 这意味着它们的所有训练信号都来自世界模型内部的"梦境 rollout"，而非真实环境的反馈。
+RSSM 的训练涉及一个核心张力。编码器 $q_\phi(\mathbf{z}_t \mid \mathbf{h}_t, \mathbf{x}_t)$ 在**看到真实观测后**产生后验潜变量 $\mathbf{z}_t$；动态预测器 $p_\phi(\hat{\mathbf{z}}_t \mid \mathbf{h}_t)$ 在**不看真实观测的情况下**产生先验预测 $\hat{\mathbf{z}}_t$。世界模型的 KL 损失衡量先验与后验之间的距离：
 
-**Actor（策略网络）：** 结构是一个标准 MLP，输入为世界模型的完整状态 $\mathbf{s}_t = \{\mathbf{h}_t, \mathbf{z}_t\}$，输出为动作分布的参数（连续动作用高斯分布的均值和标准差，离散动作用 softmax 类别概率）。训练时，从任意已访问过的真实状态出发，用 RSSM 的**动态预测器**（不用编码器——因为在想象中没有真实观测可以编码）在潜空间中展开 $H=16$ 步的"想象轨迹"：每一步根据当前策略采样动作 $\mathbf{a}_t \sim \pi_\theta(\cdot \mid \mathbf{s}_t)$，用动态预测器生成下一个状态 $\mathbf{s}_{t+1}$（其中 $\mathbf{h}_{t+1}$ 由序列模型更新，$\hat{\mathbf{z}}_{t+1}$ 由动态预测器采样），奖励预测器给出 $\hat{r}_t$。对这 16 步想象轨迹上的每个状态，用 **REINFORCE 梯度** 更新 Actor：
+$$\mathcal{L}_{\text{KL}} = D_{\text{KL}}\!\big(q_\phi(\mathbf{z}_t \mid \mathbf{h}_t, \mathbf{x}_t) \;\big\|\; p_\phi(\hat{\mathbf{z}}_t \mid \mathbf{h}_t)\big)$$
 
-$$\nabla_\theta \mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}} \left[ \log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot (G_t^\lambda - v_\psi(\mathbf{s}_t)) \right]$$
+如果这个损失被不加区分地最小化，编码器可能崩溃——把所有 $\mathbf{x}_t$ 映射到同一个 $\mathbf{z}_t$，使得先验和后验都退化到无信息的先验分布。DreamerV3 用两个机制来解决：
 
-其中 $G_t^\lambda$ 是 $\lambda$-return——奖励的指数加权和（$\lambda=0.95$），$v_\psi(\mathbf{s}_t)$ 是 Critic 给出的价值基线。$(G_t^\lambda - v_\psi)$ 被称为**优势函数（advantage）**——正值表示"比预期好"，Actor 会增强该动作的概率。
+**KL 平衡（KL Balancing）。** 把 KL 损失拆成两部分，分配不同的权重：
 
-**Critic（价值网络）：** 结构同样是 MLP，输入 $\mathbf{s}_t$，输出不是单个标量，而是**一个过 255 个等距桶的 softmax 分布**（桶覆盖 symlog 范围 $[-20, +20]$）。目标值 $G_t^\lambda$ 被编码为"two-hot"——即如果目标值落在桶 $k$ 和 $k+1$ 之间，则两个桶按比例各分配一部分概率质量，其余桶为 0。Critic 通过最小化与这个 two-hot 目标的交叉熵来训练：
+$$\mathcal{L}_{\text{dyn}} = \beta_{\text{dyn}} \cdot D_{\text{KL}}\!\big(\text{sg}[q_\phi] \;\big\|\; p_\phi\big), \quad \mathcal{L}_{\text{rep}} = \beta_{\text{rep}} \cdot D_{\text{KL}}\!\big(q_\phi \;\big\|\; \text{sg}[p_\phi]\big)$$
 
-$$\mathcal{L}_{\text{critic}} = -\sum_{k=1}^{255} \text{twohot}(G_t^\lambda)_k \cdot \log v_\psi(\mathbf{s}_t)_k$$
+其中 $\text{sg}[\cdot]$ 表示 stop-gradient（该侧不接收梯度）。$\beta_{\text{dyn}} = 0.5$（动力学侧），$\beta_{\text{rep}} = 0.1$（表征侧）。$\beta_{\text{rep}} < \beta_{\text{dyn}}$ 意味着：**让动态预测器追赶编码器的力度，大于让编码器迁就动态预测器的力度。** 换句话说——"宁可让编码器保留更多信息，然后让预测器努力跟上，而非让编码器偷懒去迎合预测器。"
 
-这种离散化回归（而非标准 MSE）的好处在于：对异常值不敏感，并且天然处理不同数量级的价值——与 symlog 配合得天衣无缝。
+**自由比特（Free Bits）。** 即使有 KL 平衡，当 KL 散度已经很小（$\approx$ 1 nat，即约 1.44 bits）时，继续惩罚已经没有意义——编码器已经从观测中提取了足够的信息。DreamerV3 在 KL 低于 1 nat 时**截断梯度**：$\max(\mathcal{L}_{\text{KL}} - 1, 0)$。这防止了编码器在训练后期被过度正则化而丢失关键信息。
 
-**四项关键创新：**
+---
 
-1. **Symlog / Symexp 变换：**
-   $$\text{symlog}(x) = \text{sign}(x) \cdot \ln(|x| + 1)$$
-   在 symlog 空间中做所有回归——解码器重建、奖励预测、Critic 目标、编码器输入归一化。这一招让同一个损失函数在奖励范围跨越 6 个数量级（Atari 的 ±1 到 DMLab 的 1000+）的任务上都能工作。
+**Actor 和 Critic：纯想象训练。**
 
-2. **KL 平衡 + 自由比特：**
-   - $\beta_{\text{dyn}} = 0.5$ vs $\beta_{\text{rep}} = 0.1$：推动更多信息通过确定性路径（$h_t$），减少对随机潜变量 $z_t$ 的依赖
-   - KL 低于 1 nat 时停止惩罚：防止模型崩塌到无信息的先验
+世界模型训练好后，DreamerV3 的策略训练**完全不接触真实环境数据**。Actor 和 Critic 的所有学习都发生在大脑的"梦境"中。
 
-3. **32 个分类分布**（来自 DreamerV2）：每个潜变量是 32 类的分类分布而非高斯分布。分类潜变量自然处理多模态未来——"在这个路口，我可以左转、右转、或直行"——不需要做多模态高斯近似的数学杂技。
+**为什么需要 Actor-Critic？** 回顾 §0.2：RL 的核心是在环境中找到最大化累计奖励的策略。Actor-Critic 是解决这个问题的最主流范式：Actor（策略网络 $\pi_\theta$）负责**做决策**——给定当前状态 $\mathbf{s}_t$，输出动作 $\mathbf{a}_t$。Critic（价值网络 $v_\psi$）负责**评估局面**——给定状态 $\mathbf{s}_t$，估计从这个状态出发按当前策略能获得多少累计奖励。Critic 的输出作为"基线"，帮助 Actor 判断每个动作是"好于平均"还是"差于平均"，从而降低梯度方差。
 
-4. **固定超参数跨所有任务：** 这是 DreamerV3 最关键的声明——模型大小、学习率、KL 尺度、想象视野、所有超参数在 150+ 个任务上完全一致。
+**想象轨迹的生成。** 从真实环境 replay buffer 中随机抽取一个已访问过的真实状态 $\mathbf{s}_t$ 作为起点，然后**关闭眼睛**——只用动态预测器展开 $H=16$ 步的未来：
 
-**关键结果。** DreamerV3 在 Atari 100K（26 款游戏，2 小时实时）、Atari 200M（55 款游戏）、DMLab（30 个 3D 任务，100 倍数据效率超越 IMPALA）、和 ProcGen（16 个程序生成游戏）上均达到或超越 SOTA。
+$$t = 0: \quad \mathbf{s}_0 = \{\mathbf{h}_0, \mathbf{z}_0\} \quad\text{(来自 replay buffer 的真实状态)}$$
 
-**Minecraft 钻石挑战：** 这是 DreamerV3 的标志性成就。Minecraft 钻石挑战要求 agent 自主发现完整科技树：原木 → 木板 → 工作台 → 木镐 → 石头 → 石镐 → 铁矿 → 熔炉 → 铁锭 → 铁镐 → **钻石**。此前所有方法都需要人类演示或手工设计的课程——而 DreamerV3 仅靠探索和世界模型的想象，自主发现了全部步骤。最优种子在 1 亿步后收集了 6 颗钻石。
+$$t = 1, 2, ..., H{:} \quad \mathbf{a}_{t-1} \sim \pi_\theta(\cdot \mid \mathbf{s}_{t-1}) \quad\text{(Actor 决定动作)}$$
+
+$$\mathbf{h}_t = f_\phi(\mathbf{h}_{t-1}, \mathbf{z}_{t-1}, \mathbf{a}_{t-1}) \quad\text{(序列模型：确定性更新)}$$
+
+$$\hat{\mathbf{z}}_t \sim p_\phi(\cdot \mid \mathbf{h}_t) \quad\text{(动态预测器：采样潜变量)}$$
+
+$$\mathbf{s}_t = \{\mathbf{h}_t, \hat{\mathbf{z}}_t\}, \quad \hat{r}_{t-1} = p_\phi(\cdot \mid \mathbf{h}_{t-1}, \mathbf{z}_{t-1}) \quad\text{(构成新状态 + 预测奖励)}$$
+
+这 16 步构成一条"想象轨迹" $\{(\mathbf{s}_0, \mathbf{a}_0, \hat{r}_0), (\mathbf{s}_1, \mathbf{a}_1, \hat{r}_1), \dots, (\mathbf{s}_H)\}$。
+
+**$\lambda$-return 的计算。** 给定一条想象轨迹上的奖励序列 $\{\hat{r}_0, \hat{r}_1, ..., \hat{r}_{H-1}\}$ 和最后一个状态的 Critic 估计 $v_\psi(\mathbf{s}_H)$，$\lambda$-return $G_t^\lambda$ 是对**从 $t$ 时刻到未来的累计奖励**的一种平滑估计，它通过递归计算：
+
+$$G_H^\lambda = v_\psi(\mathbf{s}_H) \quad\text{(最后一步，靠 Critic 估计剩余价值)}$$
+
+$$G_{k}^\lambda = \hat{r}_{k} + \gamma \Big((1-\lambda) \cdot v_\psi(\mathbf{s}_{k+1}) + \lambda \cdot G_{k+1}^\lambda\Big)$$
+
+其中 $\gamma=0.997$ 是折扣因子，$\lambda=0.95$ 控制"使用真实奖励 vs 使用 Critic 估计"的权衡：
+- $\lambda=0$：$G_k^\lambda$ 完全依赖单步奖励 + Critic 估计（低方差但可能偏倚）
+- $\lambda=1$：$G_k^\lambda$ 完全依赖实际采样的多步奖励（无偏倚但高方差）
+- $\lambda=0.95$：DreamerV3 的选择——几乎全用实际奖励，但在最后几步平滑过渡到 Critic 估计
+
+**Actor 的更新。** 对于轨迹上的每个状态 $\mathbf{s}_t$，计算**优势** $A_t = G_t^\lambda - v_\psi(\mathbf{s}_t)$。如果 $A_t > 0$（实际回报高于预期），提高 $\mathbf{a}_t$ 的概率；如果 $A_t < 0$，降低。梯度公式为：
+
+$$\nabla_\theta \mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}}\!\Big[\log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot \text{sg}\!\big(G_t^\lambda - v_\psi(\mathbf{s}_t)\big)\Big]$$
+
+**Critic 的更新。** Critic 只需要学习预测 $\lambda$-return。DreamerV3 采用**离散回归**：将 symlog 空间的范围 $[-20, +20]$ 等分为 255 个桶。对于目标值 $G_t^\lambda$（已在 symlog 空间中），先做 **two-hot 编码**——如果 $G_t^\lambda = 3.4$，它在桶 3 和桶 4 之间，则桶 3 分配 $0.6$ 的概率质量、桶 4 分配 $0.4$，其余桶为 0。Critic 输出对这 255 个桶的 softmax 分布，用交叉熵损失拟合这个 two-hot 目标：
+
+$$\mathcal{L}_{\text{critic}} = -\sum_{k=1}^{255} \text{twohot}\!\big(\text{symlog}(G_t^\lambda)\big)_k \cdot \log v_\psi(\mathbf{s}_t)_k$$
+
+离散回归配合 symlog 的优势是：不论 $G_t^\lambda = 1$ 还是 $1000$，symlog 将其压缩到 0.69 和 6.91，都在 $[-20,+20]$ 范围内，同一个 255 桶的离散头统一处理。
+
+---
+
+**固定超参数与关键结果。**
+
+DreamerV3 最引人注目的声明是：以上所有设计——模型大小、学习率、KL 系数、想象视野 $H=16$、$\lambda=0.95$、自由比特阈值 1 nat——在 **150+ 个任务上完全一致**，没有任何逐任务调参。这在 RL 领域几乎是史无前例的。
+
+结果：DreamerV3 在 Atari 100K（26 款游戏，相当于 2 小时实时游戏）、Atari 200M（55 款游戏，首个超越顶级无模型方法的基于模型方法）、DMLab（30 个 3D 任务，以 **100× 数据效率** 超越 IMPALA——仅用 100M 帧达到 IMPALA 在 10B 帧的性能）、DeepMind Control Suite 和 ProcGen 上均达到或超越 SOTA。
+
+**Minecraft 钻石挑战**是 DreamerV3 的标志性成就。从一无所知到收集钻石，agent 必须自主发现并执行一个包含十多个步骤的技术树：原木 → 木板 → 工作台 → 木镐 → 石头 → 石镐 → 铁矿 → 熔炉 → 铁锭 → 铁镐 → **钻石**。此前所有成功方法都需要人类演示或手工设计的课程。DreamerV3 仅靠探索和世界模型的想象，自主发现了全部步骤。最佳种子在 1 亿环境步后收集了 6 颗钻石。
 
 ### 3.2 IRIS：把世界动态建模为序列预测
 
