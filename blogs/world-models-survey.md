@@ -613,6 +613,8 @@ graph TB
 
 ## 3. 梦的极限：DreamerV3 与 IRIS (2023)
 
+> **IRIS** = **I**magination with auto-**R**egression over an **I**nner **S**peech（基于内心语言的想象式自回归模型）。
+
 ### 3.0 问题引入
 
 LeCun 的 JEPA 白皮书说"不要在像素空间中预测"。但在 JEPA 尚未大规模实现的同时，另一条路在问一个不同的问题：**如果我们坚持像素预测，能走多远？**
@@ -625,16 +627,35 @@ LeCun 的 JEPA 白皮书说"不要在像素空间中预测"。但在 JEPA 尚未
 
 DreamerV3 的世界模型由五个组件组成，端到端训练：
 
-```
-编码器：     z_t ~ q_φ(z_t | h_t, x_t)           [32 个 32 类的分类潜变量]
-序列模型：    h_t = f_φ(h_{t-1}, z_{t-1}, a_{t-1})  [GRU，确定性路径]
-动态预测器：  ẑ_t ~ p_φ(ẑ_t | h_t)                [闭眼预测——不看到 x_t]
-解码器：     x̂_t = p_φ(x̂_t | h_t, z_t)            [像素重建]
-奖励预测器：  r̂_t = p_φ(r̂_t | h_t, z_t)            [Symlog 空间中预测]
-继续预测器：  ĉ_t = p_φ(ĉ_t | h_t, z_t)            [episode 是否终止]
-```
+| 组件 | 公式 | 作用 |
+|------|------|------|
+| **编码器** | $\mathbf{z}_t \sim q_\phi(\mathbf{z}_t \mid \mathbf{h}_t, \mathbf{x}_t)$ | 从当前观测 $\mathbf{x}_t$ 和隐藏状态 $\mathbf{h}_t$ 中提取**随机潜变量** $\mathbf{z}_t$（32 个 32 类的分类分布），捕捉视觉细节 |
+| **序列模型** | $\mathbf{h}_t = f_\phi(\mathbf{h}_{t-1}, \mathbf{z}_{t-1}, \mathbf{a}_{t-1})$ | **GRU** 确定性路径：将上一时刻的隐藏状态、随机潜变量和动作整合为新的隐藏状态 $\mathbf{h}_t$，承载时序记忆 |
+| **动态预测器** | $\hat{\mathbf{z}}_t \sim p_\phi(\hat{\mathbf{z}}_t \mid \mathbf{h}_t)$ | **"闭眼预测"**——仅从 $\mathbf{h}_t$ 预测下一时刻的潜变量 $\hat{\mathbf{z}}_t$，不依赖真实观测。训练时与编码器的 $\mathbf{z}_t$ 对比（KL 损失），想象时替代真实编码器 |
+| **解码器** | $\hat{\mathbf{x}}_t = p_\phi(\hat{\mathbf{x}}_t \mid \mathbf{h}_t, \mathbf{z}_t)$ | 从 $(\mathbf{h}_t, \mathbf{z}_t)$ 重建原始观测，用作**训练信号**（迫使潜变量保留视觉信息） |
+| **奖励/继续预测器** | $\hat{r}_t, \hat{c}_t = p_\phi(\cdot \mid \mathbf{h}_t, \mathbf{z}_t)$ | 预测即时奖励和 episode 是否终止。均在 symlog 空间中预测（见下文创新 1） |
 
-**Actor 和 Critic 完全在想象中训练——不接触任何真实环境数据。** Actor 是一个 MLP，在 RSSM 用动态预测器展开的 16 步想象 rollouts 上用 REINFORCE + λ-return 训练。Critic 用 two-hot softmax 编码回归 $\lambda$-return。
+其中 $\phi$ 统指世界模型的所有参数。
+
+**Actor-Critic 背景简介。** 在现代强化学习中，Actor 和 Critic 是两个协同训练的神经网络，共同解决"如何将奖励信号转化为更好的动作"这个问题：
+
+- **Actor（策略网络）**：输入状态 $\mathbf{s}_t$，输出动作 $\mathbf{a}_t$。**它的职责是决定"做什么"**——在当前位置，方向盘该打多少度。
+- **Critic（价值网络）**：输入状态 $\mathbf{s}_t$，输出对该状态的"价值"估计 $v(\mathbf{s}_t)$——即从这个状态出发，按照当前策略期望能获得的累计奖励。**它的职责是判断"这个位置有多好"**。
+- **协同机制**：Actor 做出动作，Critic 评估这个动作的结果有多好。Actor 用 Critic 的输出作为基准线（baseline）来降低梯度方差——如果某个动作的回报比 Critic 预测的更好，就提高该动作的概率；如果更差，就降低。这被称为 **REINFORCE with baseline** 或 **Advantage Actor-Critic (A2C)**。
+
+**DreamerV3 的 Actor 和 Critic 完全在想象中训练——不接触任何真实环境数据。** 这意味着它们的所有训练信号都来自世界模型内部的"梦境 rollout"，而非真实环境的反馈。
+
+**Actor（策略网络）：** 结构是一个标准 MLP，输入为世界模型的完整状态 $\mathbf{s}_t = \{\mathbf{h}_t, \mathbf{z}_t\}$，输出为动作分布的参数（连续动作用高斯分布的均值和标准差，离散动作用 softmax 类别概率）。训练时，从任意已访问过的真实状态出发，用 RSSM 的**动态预测器**（不用编码器——因为在想象中没有真实观测可以编码）在潜空间中展开 $H=16$ 步的"想象轨迹"：每一步根据当前策略采样动作 $\mathbf{a}_t \sim \pi_\theta(\cdot \mid \mathbf{s}_t)$，用动态预测器生成下一个状态 $\mathbf{s}_{t+1}$（其中 $\mathbf{h}_{t+1}$ 由序列模型更新，$\hat{\mathbf{z}}_{t+1}$ 由动态预测器采样），奖励预测器给出 $\hat{r}_t$。对这 16 步想象轨迹上的每个状态，用 **REINFORCE 梯度** 更新 Actor：
+
+$$\nabla_\theta \mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}} \left[ \log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot (G_t^\lambda - v_\psi(\mathbf{s}_t)) \right]$$
+
+其中 $G_t^\lambda$ 是 $\lambda$-return——奖励的指数加权和（$\lambda=0.95$），$v_\psi(\mathbf{s}_t)$ 是 Critic 给出的价值基线。$(G_t^\lambda - v_\psi)$ 被称为**优势函数（advantage）**——正值表示"比预期好"，Actor 会增强该动作的概率。
+
+**Critic（价值网络）：** 结构同样是 MLP，输入 $\mathbf{s}_t$，输出不是单个标量，而是**一个过 255 个等距桶的 softmax 分布**（桶覆盖 symlog 范围 $[-20, +20]$）。目标值 $G_t^\lambda$ 被编码为"two-hot"——即如果目标值落在桶 $k$ 和 $k+1$ 之间，则两个桶按比例各分配一部分概率质量，其余桶为 0。Critic 通过最小化与这个 two-hot 目标的交叉熵来训练：
+
+$$\mathcal{L}_{\text{critic}} = -\sum_{k=1}^{255} \text{twohot}(G_t^\lambda)_k \cdot \log v_\psi(\mathbf{s}_t)_k$$
+
+这种离散化回归（而非标准 MSE）的好处在于：对异常值不敏感，并且天然处理不同数量级的价值——与 symlog 配合得天衣无缝。
 
 **四项关键创新：**
 
