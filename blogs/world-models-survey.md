@@ -718,6 +718,10 @@ $$\mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}}\!\Big[\log \pi_\thet
 >
 > 策略是一个**高斯分布**：$\pi_\theta(a) = \mathcal{N}(a \mid \mu = \theta, \sigma = 0.5)$。整个策略只有一个可学参数 $\theta$——高斯均值的位置。$\theta$ 和 $a$ 的关系始终如一：$\theta$ 变大 → 高斯右移 → 采出更大推力的概率升高；$\theta$ 和 $\log\pi_\theta(a)$ 的公式也始终是同一个（高斯概率密度取对数），**不论采出什么动作，数学形式都不变**。这和 DreamerV3 中 Actor 用 MLP 输出高斯均值和标准差来建模连续方向盘转角是一模一样的思路。
 >
+> **先看一个会崩溃的版本。** 奖励是二次惩罚 $G_{\text{raw}} = -(a - a^*)^2 + \text{noise}$。当 $a$ 恰好采样到远离 $a^*$ 时（比如 $a=-1$），$G_{\text{raw}} = -16$——原本应该是一个"这个动作很差，少学它"的负反馈。但策略梯度的尺度是 $(a-\theta)/\sigma^2 \cdot G_{\text{raw}}$：如果此时 $\theta=0$，梯度 $\propto (-4) \times (-16) = 64$，$\theta$ 一瞬间从 0 跳到 6.4，越过最优值 3.0。下一轮 $\theta=6.4$ 采出的 $a$ 更远，$G_{\text{raw}}$ 更大，梯度更大……发散。**这正是纯 REINFORCE 在跨数量级奖励下的经典失败模式——也是 DreamerV3 使用 symlog 的动机。**
+>
+> **用 symlog 修复。** 将 $G_{\text{raw}}$ 通过 symlog 压缩——符号保留，绝对值取对数（回想 §3.1 开头对 symlog 的定义，$G_{\text{raw}}=-16$ → symlog → $\approx -2.83$，$G_{\text{raw}}=-100$ → $\approx -4.62$）——梯度尺度从爆炸降为平稳：
+>
 > ```python
 > import torch
 > import math
@@ -725,31 +729,34 @@ $$\mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}}\!\Big[\log \pi_\thet
 > # 设置：最优推力 a* = 3.0，策略是 N(μ=θ, σ=0.5)
 > a_star = 3.0
 > sigma = 0.5
-> theta = torch.tensor([0.0], requires_grad=True)  # 初始均值=0，Agent 还不知道该推多大
+> theta = torch.tensor([0.0], requires_grad=True)  # 初始均值=0
 >
 > for episode in range(200):
 >     # Step 1: 从高斯策略中采样一个连续推力
 >     a = torch.normal(mean=theta, std=sigma)       # a ~ N(θ, 0.5²)
 >
->     # Step 2: 执行推力，奖励 = 负的"距最优值有多远"的平方（带噪声）
->     G = -(a - a_star).pow(2) + torch.randn(1).item() * 0.3
+>     # Step 2: 执行推力，获得奖励（raw 形式，带噪声）
+>     G_raw = -(a - a_star).pow(2) + torch.randn(1).item() * 0.3
 >
->     # Step 3: 计算高斯密度下的 log 概率
+>     # Step 3: symlog 压缩奖励——正是 DreamerV3 的核心技巧
+>     G = torch.sign(G_raw) * torch.log(torch.abs(G_raw) + 1)
+>
+>     # Step 4: 计算高斯密度下的 log 概率
 >     log_prob = -0.5 * ((a - theta) / sigma).pow(2) \
 >                - math.log(sigma * math.sqrt(2 * math.pi))
->     loss = -log_prob * G.detach()   # ← REINFORCE 损失，G 用 detach 切断梯度
+>     loss = -log_prob * G.detach()   # ← REINFORCE 损失
 >     loss.backward()
 >
->     # Step 4: 更新
+>     # Step 5: 更新
 >     with torch.no_grad():
 >         theta -= 0.1 * theta.grad    # 学习率 0.1
 >         theta.grad.zero_()
 >
 > print(f"θ = {theta.item():.2f}  (最优 a* = {a_star})")
-> # 输出: θ ≈ 3.0  ← 策略的均值从 0 漂移到了最优推力附近！
+> # 输出: θ ≈ 3.0  ← 策略均值稳定收敛到最优推力
 > ```
 >
-> **发生了什么？** 每轮 Agent 从高斯 $\mathcal{N}(\theta, 0.5^2)$ 中采样一个推力 $a$，用奖励判断这个推力有多好。当 $a$ 碰巧接近 3.0 时，$G$ 很大（约 $0$），负数很小——`loss = -log_prob · G` 约等于 $0$，参数几乎不更新。当 $a$ 远离 3.0（比如 $a=-1$）时，$G = -((-1)-3)^2 = -16$，`loss = -log_prob · (-16)` = 一个大的正数——**但对 $\theta$ 求梯度后，效果是"把均值推离 -1 这个区域"**。关键在于：`log_prob = -(a-θ)²/(2σ²) + const`，它的梯度 $\partial \log\pi / \partial\theta = (a-\theta) / \sigma^2$。如果 $a=-1$ 且 $\theta=0$，梯度 = $-1/0.25 = -4$，所以 $\nabla_\theta \mathcal{L} = -(-4) \cdot (-16) = -64$——$\theta$ 减去一个负数（即加上一个正数），**均值向右移动**，远离了低奖励区域。200 轮后，$\theta$ 从 0 收敛到约 3.0。
+> **发生了什么？** 取 $a=-1, \theta=0$ 为例。$G_{\text{raw}} = -16$，symlog 后 $G \approx -2.83$。$\partial \log\pi / \partial\theta = (a-\theta)/\sigma^2 = -4$。$\nabla_\theta \mathcal{L} = -(-4) \times (-2.83) = -11.3$，更新量 $= -0.1 \times (-11.3) = +1.13$——$\theta$ 从 0 温和地挪到 1.13，而不是之前的 6.4。当 $\theta$ 接近 3.0 时，采出的 $a$ 大多落在 $[2,4]$ 区间，$G_{\text{raw}} \in [-1, 0]$，梯度几乎消失，$\theta$ 稳定在 3.0 附近。
 >
 > **策略梯度定理的正式形式**（Sutton & Barto, 2018, §13.3）：
 > $$\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta}\!\Big[ \nabla_\theta \log \pi_\theta(\mathbf{a} \mid \mathbf{s}) \cdot Q^{\pi_\theta}(\mathbf{s}, \mathbf{a}) \Big]$$
