@@ -708,25 +708,54 @@ $$G_{k}^\lambda = \hat{r}_{k} + \gamma \Big((1-\lambda) \cdot v_\psi(\mathbf{s}_
 
 **Actor 的更新。** 对于轨迹上的每个状态 $\mathbf{s}_t$，计算**优势** $A_t = G_t^\lambda - v_\psi(\mathbf{s}_t)$。如果 $A_t > 0$（实际回报高于预期），提高 $\mathbf{a}_t$ 的概率；如果 $A_t < 0$，降低。梯度公式为：
 
-$$\nabla_\theta \mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}}\!\Big[\log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot \text{sg}\!\big(G_t^\lambda - v_\psi(\mathbf{s}_t)\big)\Big]$$
+$$\mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}}\!\Big[\log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot \text{sg}\!\big(G_t^\lambda - v_\psi(\mathbf{s}_t)\big)\Big]$$
 
-> **▸ 小专题：这个 Actor 梯度公式是怎么来的？**
+> **▸ 小专题：策略梯度定理与 DreamerV3 的 Actor 损失**
 >
-> 这个公式来自**策略梯度定理**（Policy Gradient Theorem），而非随意设计。先从最简单的情形推导。
+> 这个损失公式源自 **REINFORCE 算法**（Williams, 1992）和**策略梯度定理**（Sutton et al., 1999）。核心思想是：策略（Actor）不直接知道每个动作"应该值多少分"，它只能通过采样后的实际回报来**事后判断**每个动作的好坏。
 >
-> **假设没有任何 Critic。** Agent 从状态 $\mathbf{s}_t$ 出发，按策略 $\pi_\theta$ 采样了一个动作 $\mathbf{a}_t$，获得了累计回报 $G_t$。我们想要最大化期望回报。策略梯度定理告诉我们：
+> **一个极简例子（双摇臂老虎机）。** 假设有两个按钮 A 和 B，按 A 的期望奖励是 +10，按 B 是 +1。策略用单个参数 $\theta$ 表示：$\pi_\theta(\text{A}) = \sigma(\theta) = 1 / (1+e^{-\theta})$，$\pi_\theta(\text{B}) = 1 - \sigma(\theta)$。当 $\theta=0$ 时，两个按钮等概率。
 >
-> $$\nabla_\theta J = \mathbb{E}\!\Big[ \nabla_\theta \log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot G_t \Big]$$
+> ```python
+> import torch
+> import torch.nn.functional as F
 >
-> 解读：对 $\theta$ 求梯度时，$\log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t)$ 像一个"指示器"——它的梯度指向**使已采样的动作 $\mathbf{a}_t$ 更可能的方向**。$G_t$ 是标量权重——如果 $G_t$ 很大（做了好动作），就大步朝 $\mathbf{a}_t$ 的方向更新参数；如果 $G_t$ 很小（做了差动作），就小步更新甚至反方向。
+> # 设置：两个按钮，A 期望奖励 10，B 期望奖励 1
+> theta = torch.tensor([0.0], requires_grad=True)
+> rewards = [10.0, 1.0]
 >
-> **引入 Critic 作为基线。** 纯策略梯度有一个问题：$G_t$ 的绝对值在不同游戏中差异巨大（Atari $[-1, +1]$、DMLab $[0, 1000^+]$），且方差很高。如果在 $G_t$ 后面减掉一个**不依赖于 $\mathbf{a}_t$ 的基线** $b(\mathbf{s}_t)$，期望梯度不变（因为 $\mathbb{E}[\nabla\log\pi \cdot b] = b \cdot \mathbb{E}[\nabla\log\pi] = b \cdot 0 = 0$），但方差大幅降低。Critic $v_\psi(\mathbf{s}_t)$ 就是这样一个自然的基线——它代表了"从 $\mathbf{s}_t$ 出发的平均表现"。
+> for episode in range(100):
+>     # Step 1: 按当前策略采样动作
+>     prob_a = torch.sigmoid(theta)
+>     action = 0 if torch.rand(1) < prob_a else 1  # 0=A, 1=B
 >
-> $$\nabla_\theta J = \mathbb{E}\!\Big[ \nabla_\theta \log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot \big(G_t^\lambda - v_\psi(\mathbf{s}_t)\big) \Big]$$
+>     # Step 2: 执行动作，获得奖励（带噪声）
+>     G = rewards[action] + torch.randn(1).item() * 3.0
 >
-> $A_t = G_t^\lambda - v_\psi(\mathbf{s}_t)$ 被称为**优势函数**：正值 = "这个动作比平均好，多学它"；负值 = "这个动作比平均差，少学它"。注意 $\text{sg}[A_t]$ 中的 stop-gradient——$A_t$ 只作为**常数权重**，不参与 $\theta$ 的反向传播，这阻止了 Actor 通过"让 Critic 高估价值"来作弊。
+>     # Step 3: 计算策略梯度
+>     log_prob = torch.log(torch.sigmoid(theta) if action == 0
+>                          else 1 - torch.sigmoid(theta))
+>     loss = -log_prob * G          # ← 这就是 REINFORCE 损失！
+>     loss.backward()
 >
-> **所以 $\mathcal{L}_{\text{actor}} = -\log\pi_\theta(\mathbf{a}_t) \cdot A_t$ 不是一个"任意选定的损失函数"**——它是策略梯度定理在引入 Advantage 基线后的自然推导结果。负号是因为梯度下降最小化损失 = 最大化回报。
+>     # Step 4: 更新
+>     with torch.no_grad():
+>         theta -= 0.05 * theta.grad
+>         theta.grad.zero_()
+>
+> print(f"θ={theta.item():.2f}, P(A)={torch.sigmoid(theta).item():.2f}")
+> # 输出: θ≈2.x, P(A)≈0.9+  ← 策略学到了"多按 A"
+> ```
+>
+> **发生了什么？** 当 Agent 按 A 时，`G ≈ +10`，`loss = -log(π_A) · (+10)`，最小化 loss 等价于最大化 `log(π_A)`——即增大按 A 的概率。当 Agent 按 B 时，`G ≈ +1`，`loss = -log(π_B) · (+1)`，权重很小，基本不动。经过 100 轮，$\theta$ 漂移到正值，A 的概率超过 90%。
+>
+> **策略梯度定理的正式形式**（Sutton & Barto, 2018, §13.3）：
+> $$\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta}\!\Big[ \nabla_\theta \log \pi_\theta(\mathbf{a} \mid \mathbf{s}) \cdot Q^{\pi_\theta}(\mathbf{s}, \mathbf{a}) \Big]$$
+> 即：期望回报 $J$ 对策略参数 $\theta$ 的梯度，等于"对数概率的梯度"乘以"该动作的质量 $Q$"的期望。这是 RL 中极少数**不需要知道环境动态就能计算**的梯度——你只需要采样动作并观察回报。
+>
+> **从定理到 DreamerV3 的损失函数。** 在深度学习中，我们通常不手动计算 $\nabla_\theta$，而是写一个损失函数让自动微分去做。因为 $\nabla_\theta \mathcal{L} = -\nabla_\theta \log \pi_\theta \cdot A \iff \mathcal{L} = -\log \pi_\theta \cdot A$（$A$ 视为常数，通过 $\text{sg}$ 切断梯度），所以 DreamerV3 的 Actor 损失就是定理在引入 Advantage 基线后的直接翻译：
+> $$\mathcal{L}_{\text{actor}} = -\log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot \text{sg}(A_t)$$
+> 其中 $\text{sg}[A_t]$（stop-gradient）确保 $A_t$ 只作为标量权重，不产生梯度——否则 Actor 可以通过"让 Critic 高估价值"来降低损失而无需真正改进策略。这是一个实现上的优雅技巧：**定理说"对数概率的梯度 × 回报"，代码写"−log_prob × 回报 的损失"，自动微分自动算出相同的梯度。**
 
 **Critic 的更新。** Critic 只需要学习预测 $\lambda$-return。DreamerV3 采用**离散回归**：将 symlog 空间的范围 $[-20, +20]$ 等分为 255 个桶。对于目标值 $G_t^\lambda$（已在 symlog 空间中），先做 **two-hot 编码**——如果 $G_t^\lambda = 3.4$，它在桶 3 和桶 4 之间，则桶 3 分配 $0.6$ 的概率质量、桶 4 分配 $0.4$，其余桶为 0。Critic 输出对这 255 个桶的 softmax 分布，用交叉熵损失拟合这个 two-hot 目标：
 
