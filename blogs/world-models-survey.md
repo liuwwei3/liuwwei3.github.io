@@ -710,9 +710,44 @@ $$G_{k}^\lambda = \hat{r}_{k} + \gamma \Big((1-\lambda) \cdot v_\psi(\mathbf{s}_
 
 $$\nabla_\theta \mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}}\!\Big[\log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot \text{sg}\!\big(G_t^\lambda - v_\psi(\mathbf{s}_t)\big)\Big]$$
 
+> **▸ 小专题：这个 Actor 梯度公式是怎么来的？**
+>
+> 这个公式来自**策略梯度定理**（Policy Gradient Theorem），而非随意设计。先从最简单的情形推导。
+>
+> **假设没有任何 Critic。** Agent 从状态 $\mathbf{s}_t$ 出发，按策略 $\pi_\theta$ 采样了一个动作 $\mathbf{a}_t$，获得了累计回报 $G_t$。我们想要最大化期望回报。策略梯度定理告诉我们：
+>
+> $$\nabla_\theta J = \mathbb{E}\!\Big[ \nabla_\theta \log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot G_t \Big]$$
+>
+> 解读：对 $\theta$ 求梯度时，$\log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t)$ 像一个"指示器"——它的梯度指向**使已采样的动作 $\mathbf{a}_t$ 更可能的方向**。$G_t$ 是标量权重——如果 $G_t$ 很大（做了好动作），就大步朝 $\mathbf{a}_t$ 的方向更新参数；如果 $G_t$ 很小（做了差动作），就小步更新甚至反方向。
+>
+> **引入 Critic 作为基线。** 纯策略梯度有一个问题：$G_t$ 的绝对值在不同游戏中差异巨大（Atari $[-1, +1]$、DMLab $[0, 1000^+]$），且方差很高。如果在 $G_t$ 后面减掉一个**不依赖于 $\mathbf{a}_t$ 的基线** $b(\mathbf{s}_t)$，期望梯度不变（因为 $\mathbb{E}[\nabla\log\pi \cdot b] = b \cdot \mathbb{E}[\nabla\log\pi] = b \cdot 0 = 0$），但方差大幅降低。Critic $v_\psi(\mathbf{s}_t)$ 就是这样一个自然的基线——它代表了"从 $\mathbf{s}_t$ 出发的平均表现"。
+>
+> $$\nabla_\theta J = \mathbb{E}\!\Big[ \nabla_\theta \log \pi_\theta(\mathbf{a}_t \mid \mathbf{s}_t) \cdot \big(G_t^\lambda - v_\psi(\mathbf{s}_t)\big) \Big]$$
+>
+> $A_t = G_t^\lambda - v_\psi(\mathbf{s}_t)$ 被称为**优势函数**：正值 = "这个动作比平均好，多学它"；负值 = "这个动作比平均差，少学它"。注意 $\text{sg}[A_t]$ 中的 stop-gradient——$A_t$ 只作为**常数权重**，不参与 $\theta$ 的反向传播，这阻止了 Actor 通过"让 Critic 高估价值"来作弊。
+>
+> **所以 $\mathcal{L}_{\text{actor}} = -\log\pi_\theta(\mathbf{a}_t) \cdot A_t$ 不是一个"任意选定的损失函数"**——它是策略梯度定理在引入 Advantage 基线后的自然推导结果。负号是因为梯度下降最小化损失 = 最大化回报。
+
 **Critic 的更新。** Critic 只需要学习预测 $\lambda$-return。DreamerV3 采用**离散回归**：将 symlog 空间的范围 $[-20, +20]$ 等分为 255 个桶。对于目标值 $G_t^\lambda$（已在 symlog 空间中），先做 **two-hot 编码**——如果 $G_t^\lambda = 3.4$，它在桶 3 和桶 4 之间，则桶 3 分配 $0.6$ 的概率质量、桶 4 分配 $0.4$，其余桶为 0。Critic 输出对这 255 个桶的 softmax 分布，用交叉熵损失拟合这个 two-hot 目标：
 
 $$\mathcal{L}_{\text{critic}} = -\sum_{k=1}^{255} \text{twohot}\!\big(\text{symlog}(G_t^\lambda)\big)_k \cdot \log v_\psi(\mathbf{s}_t)_k$$
+
+> **▸ 小专题：为什么 Critic 不用 MSE，而用离散 two-hot 回归？**
+>
+> 标准做法是用 MSE 直接回归标量价值：$\mathcal{L} = (G_t^\lambda - v_\psi(\mathbf{s}_t))^2$。DreamerV3 放弃了这个方案，原因有二：
+>
+> **问题 1：异常值放大。** MSE 对误差是平方惩罚。当奖励范围跨越数量级时（DMLab 中某一步奖励突然从 1 跳到 1000），MSE 梯度 $\propto \|G_t^\lambda - v\|$ 会产生巨大的更新步，导致训练不稳定。symlog 压缩缓解了这一点，但仍不够。
+>
+> **问题 2：多模态价值分布。** 世界模型是不完美的——从同一个状态出发，不同的想象 rollout 可能产生差异很大的 $G_t^\lambda$。此时 Critic 的最优输出应该是**价值分布**而非单个点估计。标准 MSE 隐式假设了一个高斯分布，但真实分布可能多模态。
+>
+> **离散回归的解决方案。** $v_\psi(\mathbf{s}_t)$ 输出一个在 255 个桶上的 softmax 分布——每个桶 $k$ 代表一个价值区间。目标也是一个概率分布（two-hot 编码）。Critic 通过交叉熵学习匹配这个分布：
+>
+> $$\mathcal{L} = -\sum_{k=1}^{255} p_{\text{target}}(k) \cdot \log v_\psi(k)$$
+>
+> **直觉。** 这不再是"猜一个数字，猜错扣分"，而是"猜一个概率分布，与正确答案的分布越接近越好"。255 个桶提供了足够的粒度来精确定位价值，同时将预测任务从"回归实数值"转化为"分类到区间"——
+> - **对异常值鲁棒**：交叉熵对单点极端值不敏感，因为误差是以信息论方式（$\log$ 空间）计算的，而非平方。
+> - **天然的多模态**：$v_\psi$ 可以在多个桶上分配非零概率来编码不确定性——比如在桶 3（低价值）和桶 200（高价值）上各分 0.5，表示"这个状态要么通向失败，要么通向成功"。
+> - **与 symlog 配合**：symlog 把 $G_t^\lambda$ 从可能是 $[-1000, +1000]$ 的范围压缩到 $[-7, +7]$，255 个桶均分 $[-20, +20]$ 提供了足够的覆盖。
 
 离散回归配合 symlog 的优势是：不论 $G_t^\lambda = 1$ 还是 $1000$，symlog 将其压缩到 0.69 和 6.91，都在 $[-20,+20]$ 范围内，同一个 255 桶的离散头统一处理。
 
