@@ -714,40 +714,42 @@ $$\mathcal{L}_{\text{actor}} = -\mathbb{E}_{\text{imagine}}\!\Big[\log \pi_\thet
 >
 > 这个损失公式源自 **REINFORCE 算法**（Williams, 1992）和**策略梯度定理**（Sutton et al., 1999）。核心思想是：策略（Actor）不直接知道每个动作"应该值多少分"，它只能通过采样后的实际回报来**事后判断**每个动作的好坏。
 >
-> **一个极简例子（双摇臂老虎机）。** 假设有两个按钮 A 和 B，按 A 的期望奖励是 +10，按 B 是 +1。策略用单个参数 $\theta$ 表示：$\pi_\theta(\text{A}) = \sigma(\theta) = 1 / (1+e^{-\theta})$，$\pi_\theta(\text{B}) = 1 - \sigma(\theta)$。当 $\theta=0$ 时，两个按钮等概率。
+> **一个极简例子（推车任务——连续动作）。** 一辆小车停在轨道上，你可以控制一个连续值 $a \in \mathbb{R}$（推力大小和方向）来推动小车。最优推力是 $a^* = 3.0$（推力过小推不动，过大浪费能量，3.0 最节能）。但 Agent 不知道这个最优值——它只能每次选一个推力，观察"耗了多少能源"（奖励 = 负消耗），然后凭经验调整。
+>
+> 策略是一个**高斯分布**：$\pi_\theta(a) = \mathcal{N}(a \mid \mu = \theta, \sigma = 0.5)$。整个策略只有一个可学参数 $\theta$——高斯均值的位置。$\theta$ 和 $a$ 的关系始终如一：$\theta$ 变大 → 高斯右移 → 采出更大推力的概率升高；$\theta$ 和 $\log\pi_\theta(a)$ 的公式也始终是同一个（高斯概率密度取对数），**不论采出什么动作，数学形式都不变**。这和 DreamerV3 中 Actor 用 MLP 输出高斯均值和标准差来建模连续方向盘转角是一模一样的思路。
 >
 > ```python
 > import torch
-> import torch.nn.functional as F
+> import math
 >
-> # 设置：两个按钮，A 期望奖励 10，B 期望奖励 1
-> theta = torch.tensor([0.0], requires_grad=True)
-> rewards = [10.0, 1.0]
+> # 设置：最优推力 a* = 3.0，策略是 N(μ=θ, σ=0.5)
+> a_star = 3.0
+> sigma = 0.5
+> theta = torch.tensor([0.0], requires_grad=True)  # 初始均值=0，Agent 还不知道该推多大
 >
-> for episode in range(100):
->     # Step 1: 按当前策略采样动作
->     prob_a = torch.sigmoid(theta)
->     action = 0 if torch.rand(1) < prob_a else 1  # 0=A, 1=B
+> for episode in range(200):
+>     # Step 1: 从高斯策略中采样一个连续推力
+>     a = torch.normal(mean=theta, std=sigma)       # a ~ N(θ, 0.5²)
 >
->     # Step 2: 执行动作，获得奖励（带噪声）
->     G = rewards[action] + torch.randn(1).item() * 3.0
+>     # Step 2: 执行推力，奖励 = 负的"距最优值有多远"的平方（带噪声）
+>     G = -(a - a_star).pow(2) + torch.randn(1).item() * 0.3
 >
->     # Step 3: 计算策略梯度
->     log_prob = torch.log(torch.sigmoid(theta) if action == 0
->                          else 1 - torch.sigmoid(theta))
->     loss = -log_prob * G          # ← 这就是 REINFORCE 损失！
+>     # Step 3: 计算高斯密度下的 log 概率
+>     log_prob = -0.5 * ((a - theta) / sigma).pow(2) \
+>                - math.log(sigma * math.sqrt(2 * math.pi))
+>     loss = -log_prob * G.detach()   # ← REINFORCE 损失，G 用 detach 切断梯度
 >     loss.backward()
 >
 >     # Step 4: 更新
 >     with torch.no_grad():
->         theta -= 0.05 * theta.grad
+>         theta -= 0.1 * theta.grad    # 学习率 0.1
 >         theta.grad.zero_()
 >
-> print(f"θ={theta.item():.2f}, P(A)={torch.sigmoid(theta).item():.2f}")
-> # 输出: θ≈2.x, P(A)≈0.9+  ← 策略学到了"多按 A"
+> print(f"θ = {theta.item():.2f}  (最优 a* = {a_star})")
+> # 输出: θ ≈ 3.0  ← 策略的均值从 0 漂移到了最优推力附近！
 > ```
 >
-> **发生了什么？** 当 Agent 按 A 时，`G ≈ +10`，`loss = -log(π_A) · (+10)`，最小化 loss 等价于最大化 `log(π_A)`——即增大按 A 的概率。当 Agent 按 B 时，`G ≈ +1`，`loss = -log(π_B) · (+1)`，权重很小，基本不动。经过 100 轮，$\theta$ 漂移到正值，A 的概率超过 90%。
+> **发生了什么？** 每轮 Agent 从高斯 $\mathcal{N}(\theta, 0.5^2)$ 中采样一个推力 $a$，用奖励判断这个推力有多好。当 $a$ 碰巧接近 3.0 时，$G$ 很大（约 $0$），负数很小——`loss = -log_prob · G` 约等于 $0$，参数几乎不更新。当 $a$ 远离 3.0（比如 $a=-1$）时，$G = -((-1)-3)^2 = -16$，`loss = -log_prob · (-16)` = 一个大的正数——**但对 $\theta$ 求梯度后，效果是"把均值推离 -1 这个区域"**。关键在于：`log_prob = -(a-θ)²/(2σ²) + const`，它的梯度 $\partial \log\pi / \partial\theta = (a-\theta) / \sigma^2$。如果 $a=-1$ 且 $\theta=0$，梯度 = $-1/0.25 = -4$，所以 $\nabla_\theta \mathcal{L} = -(-4) \cdot (-16) = -64$——$\theta$ 减去一个负数（即加上一个正数），**均值向右移动**，远离了低奖励区域。200 轮后，$\theta$ 从 0 收敛到约 3.0。
 >
 > **策略梯度定理的正式形式**（Sutton & Barto, 2018, §13.3）：
 > $$\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta}\!\Big[ \nabla_\theta \log \pi_\theta(\mathbf{a} \mid \mathbf{s}) \cdot Q^{\pi_\theta}(\mathbf{s}, \mathbf{a}) \Big]$$
