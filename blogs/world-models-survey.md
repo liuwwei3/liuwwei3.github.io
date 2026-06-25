@@ -1105,6 +1105,8 @@ DayDreamer（Wu et al., CoRL 2023）问了一个最实际的问题：**世界模
 
 ### 6.5 合流：Dyna 回归、平稳表征与物理知情
 
+Google DeepMind 的 *"Improving Transformer World Models for Data-Efficient RL"*（Dedieu et al., ICML 2025）是一项系统性的消融研究。它没有提出全新的架构，而是**逐一拆解了 IRIS 风格的 Transformer 世界模型的三个隐藏瓶颈**，并证明每个瓶颈的修复都比"更复杂的模型"或"更精巧的训练技巧"带来更大的性能提升。最终，三个修复合在一起，使一个简单的 MBRL agent 在 Craftax-classic 上仅用 1M 环境步就首次超越了人类专家。以下是三项改进的完整叙述。
+
 #### 6.5.1 Dyna + 预热：Sutton 1990 年在 2025 年的回归
 
 1989–1990 年间，Richard Sutton 提出了**Dyna 架构**：一个 RL agent 应该同时使用**真实环境经验**和**世界模型模拟的经验**来训练策略——两者混合，而非只取其一。在 2025 年的深度 RL 中，这个思想被基本遗忘了（DreamerV3 和 IRIS 都是"纯想象"）。
@@ -1184,25 +1186,137 @@ Phase 2: Dyna（T_BP 步之后）
 
 #### 6.5.2 最近邻分词器（NNT）：平稳码书颠覆 VQ-VAE
 
-这是 Dedieu et al. 论文中最深刻但最容易被忽略的洞察。IRIS（§2.2）的 VQ-VAE 码书是非平稳的——今天 token #42 代表"红车的前保险杠"，几轮更新后可能变成了"蓝天的纹理"。Transformer 世界模型的输入和输出都是这些离散 token，面对的是一个**不断移动的靶子**。
+这是 Dedieu et al. 论文中最深刻但最容易被忽略的洞察。要理解为什么 NNT 贡献了 +21.60 个百分点（甚至超过 Dyna 的 +11.43），先要理解它解决了什么。
 
-NNT 的解决方案简单得令人生疑：**码书只增不减。** 每个 patch 通过最近邻查找匹配现有码字；如果没有码字在阈值 $\tau$ 内，将该 patch 作为新码字加入——**此后永不更新。** 这提供了一个完全平稳的预测目标。
+**技术背景：VQ-VAE 码书为什么是非平稳的？** VQ-VAE（Van den Oord et al., 2017）通过一个可学习的离散码书将连续图像压缩为一组离散 token。码书 $\mathcal{C} = \{\mathbf{e}_1, \mathbf{e}_2, ..., \mathbf{e}_K\}$（通常是 512 个向量）在训练过程中通过 EMA（指数移动平均）或梯度下降持续更新。每次更新后，$\mathbf{e}_{42}$ 所代表的视觉模式发生微调——这本身是 VQ-VAE 的正常训练行为，为了让码字更好地覆盖数据分布。
+
+**但这对 Transformer 世界模型是隐性的灾难。** IRIS 的 Transformer 接收的是上一帧 VQ-VAE 编码的 token 序列作为输入，预测下一帧的 token 序列。它的学习目标可以概括为：给定 token 序列 $[t_1, t_2, ..., t_{16}]$ 和动作 $\mathbf{a}$，预测 $[t'_1, t'_2, ..., t'_{16}]$。但如果 VQ-VAE 的码书在训练过程中漂移——今天 $t_{42}$ 代表"红车的前保险杠"，几轮 VQ-VAE 更新后 $t_{42}$ 可能变成了"蓝天的纹理"——那么 Transformer 面对的序列预测任务本身的**语义在不断变化**。这不是"预测下一帧的视觉内容"——这是"预测一个不断移动的靶子的下一个位置"。
+
+```mermaid
+graph LR
+    subgraph VQVAE["VQ-VAE 路线 (IRIS)"]
+        Frame_t["帧 t<br/>64×64×3"] --> VQ["VQ-VAE 编码器"]
+        VQ --> Codebook["可学习码书<br/>512 个向量<br/>(EMA 持续更新)"]
+        Codebook --> Tokens["16 个离散 token<br/>[#17, #42, #88, ...]"]
+        Tokens --> TWM["Transformer 世界模型"]
+        VQ -.->|"码书更新——token 语义漂移"| Codebook
+        TWM -.->|"预测目标<br/>在不断移动"| Tokens_next["预测下一帧 token"]
+    end
+
+    subgraph NNT["NNT 路线 (Dedieu et al.)"]
+        Frame_t2["帧 t<br/>9×9 patches"] --> Patches["每个 patch<br/>独立编码"]
+        Patches --> NN["最近邻查找<br/>到静态码书"]
+        NN --> StaticCode["静态码书<br/>只增不减<br/>创建后冻结"]
+        StaticCode --> Tokens2["16 个离散 token<br/>语义永远不变"]
+        Tokens2 --> TWM2["Transformer 世界模型"]
+        TWM2 -.->|"预测目标<br/>始终平稳"| Tokens_next2["预测下一帧 token"]
+    end
+```
+
+**NNT 的编码算法——极简但关键每一步都有原因：**
+
+```python
+class NearestNeighborTokenizer:
+    """NNT：最近邻分词器。码书从空开始，只增不减。"""
+    def __init__(self, patch_size=7, threshold=0.1):
+        self.patch_size = patch_size
+        self.threshold = threshold
+        self.codebook = []          # 空码书——从零开始构建
+
+    def encode(self, image):
+        """将一帧图像编码为离散 token 序列。"""
+        patches = self._extract_patches(image)  # 如 9×9 网格 → 81 个 patch
+        tokens = []
+        for patch in patches:
+            token = self._encode_patch(patch)
+            tokens.append(token)
+        return tokens
+
+    def _encode_patch(self, patch):
+        """编码单个 patch：最近邻匹配 + 条件插入。"""
+        if len(self.codebook) == 0:
+            # 码书为空 → 第一个 patch 自动成为第一个码字
+            self.codebook.append(patch)
+            return 0
+
+        # Step 1: 计算 patch 到所有现有码字的欧氏距离
+        distances = [torch.norm(patch - code) for code in self.codebook]
+        min_dist, nearest_idx = min(distances), argmin(distances)
+
+        # Step 2: 判断是否足够接近现有码字
+        if min_dist <= self.threshold:
+            return nearest_idx          # 复用现有码字
+        else:
+            # Step 3: 距离过大 → 创建新码字，永不更新
+            self.codebook.append(patch)
+            return len(self.codebook) - 1
+```
+
+**关键设计决策（每条都有对应的消融实验）：**
+
+- **为什么阈值 $\tau$ 不能太小？** 若 $\tau \to 0$，每个 patch 都创建新码字，码书爆炸到与训练集大小相当——Transformer 的词汇表退化为"每个输入样本是一个不同的 token"，完全失去了泛化能力。
+- **为什么阈值 $\tau$ 不能太大？** 若 $\tau \to \infty$，所有 patch 映射到同一个码字——表征崩塌为零信息。
+- **为什么码字创建后永不更新？** 这是 NNT 与 VQ-VAE 最根本的分歧点。VQ-VAE 更新码字是为了让码书更好地覆盖数据分布——但代价是非平稳性。NNT 放弃了"码书覆盖"的目标，转而追求"码书平稳"——因为后者对一个序列预测模型来说比前者重要得多。如果 Transformer 必须在"一个不完美的但平稳的词汇表"（NNT）和"一个完美的但不断变化的词汇表"（VQ-VAE）之间选择，消融实验的结果是压倒性的——选择平稳。
 
 **NNT vs VQ-VAE 的核心差异：**
 
 | 维度 | VQ-VAE | NNT |
 |------|--------|-----|
-| 码书大小 | 固定（如 512） | 持续增长（随数据复杂度自然增大） |
+| 码书大小 | 固定（如 512） | 持续增长（随数据复杂度自然增大，无预设上限） |
 | 码字是否更新 | 是（EMA 或梯度） | **否——创建后冻结** |
-| 预测目标的平稳性 | 非平稳 | **平稳——#42 永远代表同一种视觉模式** |
+| 预测目标的平稳性 | 非平稳——今天 #42 ≠ 明天 #42 | **平稳——#42 永远代表同一种视觉模式** |
+| 训练稳定性 | 需要 EMA 衰减 + 承诺损失来平衡码书学习与编码精度 | 天然平稳——无需任何辅助损失 |
+| 泛化 vs 平稳的权衡 | 偏向"覆盖"——码字学习数据分布 | 偏向"平稳"——码字是对特定视觉模式的快照 |
 
-消融实验的贡献分解揭示了惊人的优先级：patches + NNT 合起来的贡献（+21.60 个百分点）甚至超过了 Dyna（+11.43）。**平稳表征比训练策略的选择更重要。** 这个发现与 JEPA 的 EMA 目标编码器（§4.1）在本质上解决了同一个问题——给预测器一个不移动的靶子。NNT 通过"创建后永不更新"实现，JEPA 通过"慢速追踪 $\text{Enc}_c$"实现。跨越 7 年，世界模型的根本瓶颈被证明不是容量或训练技巧，而是表征的平稳性。
+**消融实验的贡献分解（每步累加）：**
+```
+M1（基线 IRIS-style TWM）：      31.93%
+M2（+Dyna + warmup）：           43.36%（+11.43）
+M3（+Patches 而非 VQ-VAE）：    58.92%（+15.56）← 单个最大贡献！
+M4（+NNT 静态码书）：           64.96%（+6.04）
+M5（+BTF fast）：               67.42%（+2.46）
+M5（+BTF slow）：               69.66%（+2.24）
+```
+注意：patches + NNT 合起来的贡献（+21.60 个百分点）超过了 Dyna（+11.43）近一倍。**平稳表征比想象 vs 真实的训练策略选择更重要——这是整个合流部分最深刻的技术教训。**
 
-#### 6.5.3 分块教师强制（BTF）与 Cosmos 3
+这个发现的深层含义：它证实了**表征的平稳性是世界模型训练的最大瓶颈**——不是模型容量，不是训练技巧，不是超参数。这与 Ha & Schmidhuber 在 §1.3 中的问题——"VAE 编码了砖墙纹理却忽略了路沿"——形成了跨越 7 年的呼应。当时的问题是"无法控制编码器编码什么"；NNT 提供了一个更深刻的答案：**不控制编码的内容，但控制编码的稳定性。** 只要 token 语义不漂移，Transformer 可以在不完美的码书上通过序列建模能力补偿编码的粗糙。但如果 token 语义不断漂移，任何序列模型都无法在一个移动的靶子上做准确预测。
 
-Dedieu et al. 的第三项改进**分块教师强制（BTF）**解决了 IRIS 的一个额外低效：在每个时间步内，下一帧的 16 个 token 被逐 token 自回归预测，既慢又导致误差逐 token 累积。BTF 修改了 Transformer 的注意力掩码——同一时间步内的所有 token 之间用双向注意（联合并行预测整个帧），不同时间步之间保持因果掩码——将想象速度提升了约 2×，额外贡献了 +2.46 个百分点。最终，在 Craftax-classic 上仅用 1M 步，MBRL 达到 69.66% 奖励，**首次超越了人类专家（65.0% ± 10.5%）**。
+#### 6.5.3 分块教师强制（BTF）：联合并行预测
 
-与此同时，NVIDIA 在 2026 年推出的 **Cosmos 3** 代表了合流的另一个维度：Cosmos Predict（视频生成）、Cosmos Transfer（Sim2Real 变换）、Cosmos Reason（物理推理 VLM）不再作为独立模型存在，而是成为一个**双塔混合架构**的不同能力头——"推理塔"先用自回归 VLM 分析场景中的动作、物体交互和时空关系，"生成塔"基于推理上下文做物理上连贯的视频和动作生成。Cosmos 3 提供 Super（640 亿参数，数据中心）、Nano（160 亿参数，工作站）和 Edge（即将推出，边缘设备）三种规模，HuggingFace 开源，在 Li Auto 的产线中每天执行超过 1000 次神经场景重建和 30 万次渲染仿真。
+Dedieu et al. 的第三项改进解决的是 IRIS 的一个**时序建模低效**：在每个时间步内，下一帧的 16 个 token 是被逐 token 自回归预测的。这个设计的动机是合理的——同一帧的不同空间区域之间理论上存在依赖关系（"知道左上角是什么有助于猜测右下角"）。但它带来了两个实际问题：**慢**（16 个 token 需要 16 次串行 Transformer 前向传播）和**逐 token 误差累积**（token 1 的微小误差流入 token 2 的条件，token 2 的误差再流入 token 3，16 步串联后等效误差 $\propto 16 \cdot \epsilon_{\text{per-token}}$）。
+
+**技术背景：标准因果注意力 vs BTF。** 自回归 Transformer 的标准注意力掩码是**下三角矩阵**——位置 $i$ 只能注意位置 $j \leq i$（包括自己）。这确保了在生成时，当前 token 不能"偷看"未来的 token。对于一个交错"时序 + 空间"的序列（16 个帧 1 token + 动作 + 16 个帧 2 token + 动作 + ...），标准因果掩码允许帧 1 的所有 token 看到彼此，但在帧 2 内部——这 16 个 token 属于**同一时刻的不同空间位置**——它们之间被因果掩码强制为串行预测。
+
+```mermaid
+graph TB
+    subgraph StandardCausal["标准因果注意力掩码 (IRIS)"]
+        direction LR
+        T1_1["t1:tok1"] --> T1_2["t1:tok2"] --> T1_dots["..."] --> T1_16["t1:tok16"]
+        T1_16 --> Act1["a1"]
+        Act1 --> T2_1["t2:tok1"] --> T2_2["t2:tok2"] --> T2_dots["..."] --> T2_16["t2:tok16"]
+    end
+
+    subgraph BTF["分块教师强制 BTF"]
+        direction LR
+        BLOCK1["t1 全部 16 个 token<br/>彼此双向注意<br/>联合编码整个帧"] --> Act1B["a1"]
+        Act1B --> BLOCK2["t2 全部 16 个 token<br/>彼此双向注意<br/>联合并行预测整个帧"]
+    end
+
+    style BLOCK1 fill:#e8f5e9
+    style BLOCK2 fill:#e8f5e9
+```
+
+**BTF 的掩码构造。** 标准因果掩码是一个 $N \times N$ 的下三角矩阵（$M_{ij} = 1$ iff $i \geq j$）。BTF 将其修改为**分块下三角矩阵**：同一个时间步（block）内的所有 token 之间，掩码填为 1（双向注意——可以互看）；不同时间步之间，保持因果约束（$t$ 只能看 $\leq t$ 的块）。在这个掩码下，预测 $t+1$ 时刻的帧时，所有 16 个 token 被**联合并行生成**——Transformer 在同一轮前向传播中输出整个帧的所有 token，每个 token 的预测都以上下文帧的所有 token 和前一帧的所有 token 为条件。
+
+**为什么 BTF 的贡献（+2.46 pp）比 Dyna（+11.43）或 NNT（+6.04）小，但仍然不可或缺？** 因为 BTK 解决的不是"世界模型能否准确预测"的问题，而是"世界模型预测的速度和误差传播"的问题。逐 token 预测时，token $k$ 的误差 $\delta_k$ 会通过因果链向 token $k+1, k+2, ..., 16$ 传播：$\|\mathbf{s}_{t+1}^{\text{AR}} - \mathbf{s}_{t+1}^{\text{true}}\| = \mathcal{O}(\sum_{k=1}^{16} \delta_k \cdot (16-k))$（后面的 token 累积了前面所有 token 的误差）。BTF 消除了这个逐 token 误差级联——所有 16 个 token 的预测误差是**独立**的：$\|\mathbf{s}_{t+1}^{\text{BTF}} - \mathbf{s}_{t+1}^{\text{true}}\| = \mathcal{O}(\max_k \delta_k)$。在 16 步时间维度上展开后，这个差异被放大——这是 BTF 贡献的主要来源。
+
+**BTF 的推理加速。** 逐 token 自回归预测时，16 个 token 需要 16 次前向传播。BTF 联合并行预测整个帧——1 次前向传播输出 16 个 token。这使想象速度提升了约 2×（实际加速不到 16×，因为还有一些共享的编码和注意计算）。
+
+**最终结果。** 最慢的模型（BTF slow，在联合预测后额外用一次精炼 pass）在 Craftax-classic 上仅用 1M 环境步达到 69.66% 奖励，**首次超越了人类专家（65.0% ± 10.5%）**。在 Craftax-full 上达到 7.20%（之前 SOTA 为 6.59%）。更具启示意义的是：无模型 PPO 基线（55.49%，仅需 15 分钟训练）已经超过了他们复现的 DreamerV3（53.2%，需要 35 小时训练）——提示之前许多报告的"MBRL 增益"实则来源于**弱的无模型基线**，而非世界模型架构本身的优势。
+
+---
+
+NVIDIA 在 2026 年推出的 **Cosmos 3** 代表了合流的另一个维度：Cosmos Predict（视频生成）、Cosmos Transfer（Sim2Real 变换）、Cosmos Reason（物理推理 VLM）不再作为独立模型存在，而是成为一个**双塔混合架构**的不同能力头——"推理塔"先用自回归 VLM 分析场景中的动作、物体交互和时空关系，"生成塔"基于推理上下文做物理上连贯的视频和动作生成。Cosmos 3 提供 Super（640 亿参数，数据中心）、Nano（160 亿参数，工作站）和 Edge（即将推出，边缘设备）三种规模，HuggingFace 开源，在 Li Auto 的产线中每天执行超过 1000 次神经场景重建和 30 万次渲染仿真。
 
 #### 6.5.4 合流的三个原则
 
