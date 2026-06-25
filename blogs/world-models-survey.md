@@ -1109,17 +1109,78 @@ DayDreamer（Wu et al., CoRL 2023）问了一个最实际的问题：**世界模
 
 1989–1990 年间，Richard Sutton 提出了**Dyna 架构**：一个 RL agent 应该同时使用**真实环境经验**和**世界模型模拟的经验**来训练策略——两者混合，而非只取其一。在 2025 年的深度 RL 中，这个思想被基本遗忘了（DreamerV3 和 IRIS 都是"纯想象"）。
 
-Dedieu et al. 发现这是现代世界模型性能最大的瓶颈。世界模型的预测误差 $\epsilon_t = \hat{\mathbf{z}}_t - \mathbf{z}_t$ 在每个想象步中累积——经过 $H=16$ 步想象 rollout，$$\|\mathbf{s}_H^{\text{imagine}} - \mathbf{s}_H^{\text{real}}\| = \mathcal{O}(\epsilon \cdot H)$$ 这个误差直接转化为策略的偏差。
+Dedieu et al. 发现这是现代世界模型性能最大的瓶颈。要理解为什么，先看数据在两个训练范式下如何流动：
 
-他们的修复——**Dyna with warmup**——简单但决定性：前 $T_{\text{BP}} = 200\text{K}$ 步仅使用真实数据训练策略（warmup），之后策略同时在真实和想象数据上训练（Dyna）。Craftax-classic 上的消融实验揭示了最令人震撼的一列：
+```mermaid
+graph LR
+    subgraph PureImag["纯想象训练 (DreamerV3 / IRIS)"]
+        WM["世界模型<br/>（从真实数据学习）"] -->|"想象 rollout"| Policy["策略网络"]
+        Policy -->|"仅消费想象数据"| Loss["REINFORCE / PPO"]
+    end
 
-| 配置 | 奖励分数（%, 1M 步） | 解读 |
-|------|---------------------|------|
-| 纯想象（无 Dyna） | 55.02% | 策略被不成熟的世界模型误导 |
-| Dyna 无 warmup（从第 0 步开始想象） | **33.54%** | 不成熟世界模型的想象数据**比不加想象更糟**——远低于纯无模型 PPO 基线（55.49%） |
-| **Dyna + warmup** | **67.42%** | 预热确保世界模型先成熟，想象数据成为有效增强 |
+    subgraph DynaWarmup["Dyna + Warmup (Dedieu et al. 2025)"]
+        RealData["真实环境<br/>rollouts"] -->|"warmup 阶段"| PolicyD["策略网络"]
+        WM_D["世界模型<br/>（持续从真实数据学习）"] -->|"warmup 后"| Mixer["混合器"]
+        RealData -->|"warmup 后"| Mixer
+        Mixer -->|"n_real + n_imagine<br/>交错训练"| PolicyD
+    end
+```
 
-**直觉。** 学开车的第一天就闭眼想象驾驶——你会撞墙。练习 20 小时后，在脑中先想一遍"如果我晚一点刹车"才是有建设性的。Dyna + warmup 的数学本质是：让世界模型的误差 $\epsilon(t)$ 在 warmup 阶段下降到一个可接受的水平，然后再让策略依赖想象数据。**世界模型不是真实的替代品，而是真实的加速器。**
+**纯想象的问题在数学上是清晰的。** 世界模型的预测误差 $\epsilon_t = \hat{\mathbf{z}}_t - \mathbf{z}_t$ 在每个想象步中被累积。经过 $H=16$ 步想象 rollout：
+$$\|\mathbf{s}_H^{\text{imagine}} - \mathbf{s}_H^{\text{real}}\| = \mathcal{O}(\epsilon \cdot H)$$
+
+这个误差直接转化为策略的偏差——Actor 在脑海中完美执行了一个动作，但现实中因为世界模型不准确而失败了。更糟的是，这个偏差是**自反馈的**：策略基于有偏的世界模型学到的行为，会产生新的分布外状态，世界模型在这些状态上的误差更大，进一步加剧偏差。
+
+**Dyna with warmup 的具体机制。** 算法分两个阶段：
+
+```
+Phase 1: Warmup（前 T_BP = 200K 步）
+  for step in range(T_BP):
+      a_t = policy(s_t)                         # 策略选动作
+      s_{t+1}, r_t = env.step(a_t)              # 真实环境执行
+      buffer.add(s_t, a_t, r_t, s_{t+1})         # 存入 replay buffer
+      world_model.update(buffer)                 # 世界模型从真实数据学习
+      policy.update(real_rollouts_from_buffer)    # 策略只从真实数据学习 ← 关键
+
+Phase 2: Dyna（T_BP 步之后）
+  for step in range(T_BP, total_steps):
+      # 同上：真实交互 + 世界模型学习
+      a_t = policy(s_t)
+      s_{t+1}, r_t = env.step(a_t)
+      buffer.add(s_t, a_t, r_t, s_{t+1})
+      world_model.update(buffer)
+
+      # 新增：在想象中训练
+      for k in range(n_imagine):
+          s_start = buffer.sample()              # 从真实状态出发
+          rollout = world_model.imagine(s_start, policy, H=16)  # 闭眼展开 16 步
+          policy.update(rollout)                  # 策略从想象数据学习
+
+      # 继续从真实数据训练
+      for k in range(n_real):
+          real_batch = buffer.sample()
+          policy.update(real_batch)               # 策略也从真实数据学习 ← 关键混合
+```
+
+> **▸ 小专题：为什么 warmup 的 200K 步这么重要？一个数值实验。**
+>
+> 考虑一个简化的一维追踪任务：最优策略参数 $\theta^* = 3.0$，世界模型误差 $\epsilon(t)$ 随训练步数 $t$ 呈指数衰减 $\epsilon(t) = \epsilon_0 \cdot e^{-t/\tau}$（$\tau = 100\text{K}$ 步指世界模型每 100K 步将误差减半）。
+>
+> 在纯想象训练中，策略梯度 $\nabla_\theta \mathcal{L} \propto (G_t^\lambda - v_\psi) \cdot \nabla_\theta \log\pi_\theta$。由于 $G_t^\lambda$ 是在误差为 $\epsilon(t)$ 的世界模型中计算的，它包含一个系统性偏倚 $\delta(t) \propto \epsilon(t) \cdot H$。在 $t=0$ 时，$\epsilon(0)$ 很大（世界模型一无所知），$\delta(0)$ 在 16 步 rollout 后可能将 $\theta$ 推往完全错误的方向。即使 $\epsilon(t)$ 后续指数衰减，策略已经被早期的错误信号"污染"了——这在优化理论中被称为"早期梯度偏差"（early gradient bias），在非凸损失面上是不可逆的。
+>
+> warmup 的作用就是**等待 $\epsilon(t)$ 下降到可接受水平**，然后才让策略依赖想象数据。Dedieu et al. 的消融实验中，$T_{\text{BP}} = 200\text{K}$ 是最优选择——比 $T_{\text{BP}} = 100\text{K}$（+4.3 个百分点）和 $T_{\text{BP}} = 400\text{K}$（+1.1 个百分点，因为过长的 warmup 浪费了世界模型已经可用的想象加速能力）都要好。而 $T_{\text{BP}} = 0$（无 warmup）的结果——33.54%——低于纯无模型 PPO 基线（55.49%），说明**在错误的时间引入想象数据比完全不加想象更糟**。
+
+**Craftax-classic 消融实验的核心数据：**
+
+| 配置 | 奖励分数（%, 1M 步） | 与纯无模型 PPO 基线（55.49%）对比 |
+|------|---------------------|----------------------------------|
+| 纯想象（基线，无 Dyna） | 55.02% | ≈ 持平——世界模型的增益被误差抵消 |
+| Dyna 无 warmup（$T_{\text{BP}}=0$） | **33.54%** | **−21.95 pp**——不成熟世界模型是毒药 |
+| Dyna + warmup（$T_{\text{BP}}=200\text{K}$） | **67.42%** | **+11.93 pp**——世界模型成为真正的加速器 |
+
+最后一行是这篇论文对世界模型研究的核心判决：纯想象训练不是最优方案。世界模型是**真实的加速器，不是替代品**。35 年前 Sutton 的直觉——真假混合——被一个精心设计的消融实验证明仍然是正确的。
+
+**直觉。** 学开车的第一天就闭眼想象驾驶——你的内部模型对方向盘和车轮之间的关系只有模糊的直觉，想象只会强化错误的肌肉记忆。练习 20 小时后，你对"打 30 度方向盘，车会转多少"有了真实的理解——此时在脑中先想一遍"如果我晚一点刹车"才是有建设性的。**Dyna + warmup 的数学本质是：让世界模型的误差 $\epsilon(t)$ 在 warmup 阶段从 $\epsilon_0$ 衰减到 $\epsilon_0 \cdot e^{-200\text{K}/\tau}$（约衰减至 1/4），然后再让策略开始依赖想象数据。世界模型不是真实的替代品，而是真实的加速器。**
 
 #### 6.5.2 最近邻分词器（NNT）：平稳码书颠覆 VQ-VAE
 
