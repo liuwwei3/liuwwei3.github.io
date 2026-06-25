@@ -1186,6 +1186,8 @@ Phase 2: Dyna（T_BP 步之后）
 
 #### 6.5.2 最近邻分词器（NNT）：平稳码书颠覆 VQ-VAE
 
+> **NNT** = **N**earest **N**eighbor **T**okenizer（最近邻分词器）。**码书**（codebook）是 VQ-VAE 中的核心概念——一个由 $K$ 个可学习向量组成的离散词汇表，将连续的图像区域"翻译"为离散的 token ID。**VQ-VAE**（Vector Quantized Variational AutoEncoder, Van den Oord et al., 2017）是一种将图像压缩为离散 token 的自编码器，广泛用于图像/视频生成和表示学习——也是 §2.2 中 IRIS 使用的视觉分词器。
+
 这是 Dedieu et al. 论文中最深刻但最容易被忽略的洞察。要理解为什么 NNT 贡献了 +21.60 个百分点（甚至超过 Dyna 的 +11.43），先要理解它解决了什么。
 
 **技术背景：VQ-VAE 码书为什么是非平稳的？** VQ-VAE（Van den Oord et al., 2017）通过一个可学习的离散码书将连续图像压缩为一组离散 token。码书 $\mathcal{C} = \{\mathbf{e}_1, \mathbf{e}_2, ..., \mathbf{e}_K\}$（通常是 512 个向量）在训练过程中通过 EMA（指数移动平均）或梯度下降持续更新。每次更新后，$\mathbf{e}_{42}$ 所代表的视觉模式发生微调——这本身是 VQ-VAE 的正常训练行为，为了让码字更好地覆盖数据分布。
