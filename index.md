@@ -23,21 +23,22 @@ title: 大伟的AI学习日志
 
 ## 建议使用 AI Agent 阅读
 
-这个仓库最适合的打开方式是：**把文章下载到本地，配合 AI Agent 逐段精读。** 你不需要一开始就全部看懂——遇到不懂的段落，直接向 AI 提问。
+这个仓库最适合的打开方式是：**用 VS Code 把文章下载到本地，配合 AI Agent 逐段精读。** 你不需要一开始就全部看懂——选中不懂的段落，直接向 AI 提问。
 
 ### 三步开始
 
 <ol class="ai-steps">
   <li>
-    <strong>Clone 仓库</strong><br>
+    <strong>Clone 仓库并用 VS Code 打开</strong><br>
     <code>git clone https://github.com/liuwwei3/liuwwei3.github.io.git</code><br>
-    <code>cd liuwwei3.github.io/blogs</code>
+    <code>cd liuwwei3.github.io</code>，然后用 VS Code 打开该文件夹。
   </li>
   <li>
-    <strong>配置 AI Agent</strong><br>
-    <strong>Claude Code</strong>（推荐）：安装后在 <code>blogs/</code> 目录下运行 <code>claude</code> 即可。Claude 会自动加载 <code>CLAUDE.md</code> 获得项目上下文。<br>
-    <strong>Cursor / Windsurf</strong>：用 IDE 打开仓库，在侧栏对话中 <code>@file</code> 引用文章。<br>
-    <strong>GitHub Copilot</strong>：直接在 VS Code 中打开 <code>.md</code> 文件，选中不懂的段落用 Copilot Chat 提问。
+    <strong>安装 AI 插件</strong><br>
+    推荐以下任一方式（任选一个即可）：<br>
+    <strong>Claude Code</strong> — 在 VS Code 终端中运行 <code>claude</code>，Claude 会自动加载仓库中的 <code>CLAUDE.md</code> 获得上下文，然后你直接选中 <code>blogs/</code> 下的文章开始对话。<br>
+    <strong>GitHub Copilot Chat</strong> — VS Code 原生集成，打开 <code>.md</code> 文件，选中不懂的段落，<code>Ctrl+I</code>（Mac: <code>Cmd+I</code>）直接提问。<br>
+    <strong>Cursor</strong> — 用 Cursor 打开仓库，侧栏对话中 <code>@file</code> 引用文章。
   </li>
   <li>
     <strong>使用文中注释实现精细问答</strong><br>
