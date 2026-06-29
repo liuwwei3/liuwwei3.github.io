@@ -35,10 +35,10 @@ title: 大伟的AI学习日志
   </li>
   <li>
     <strong>安装 AI 插件</strong><br>
-    推荐以下任一方式（任选一个即可）：<br>
-    <strong>Claude Code</strong> — 在 VS Code 终端中运行 <code>claude</code>，Claude 会自动加载仓库中的 <code>CLAUDE.md</code> 获得上下文，然后你直接选中 <code>blogs/</code> 下的文章开始对话。<br>
-    <strong>GitHub Copilot Chat</strong> — VS Code 原生集成，打开 <code>.md</code> 文件，选中不懂的段落，<code>Ctrl+I</code>（Mac: <code>Cmd+I</code>）直接提问。<br>
-    <strong>Cursor</strong> — 用 Cursor 打开仓库，侧栏对话中 <code>@file</code> 引用文章。
+    推荐以下方式：<br>
+    <strong>VS Code + Claude Code</strong> — 在 VS Code 终端中安装 <code>claude code</code>插件以及<code>Markdown Preview Enhanced</code>插件，Claude code会自动加载仓库中的 <code>CLAUDE.md</code> 获得上下文，然后你直接选中 <code>blogs/</code> 下的文章开始对话。VS Code 原生集成Copilot，打开 <code>.md</code> 文件，选中不懂的段落，<code>Ctrl+I</code>（Mac: <code>Cmd+I</code>）直接提问。<br>
+    <br>配置完成之后，工作界面如下：<br>
+    <img src="config.jpeg" alt="VS Code 工作界面" style="max-width:100%; border-radius:8px; margin-top:0.4em; border:1px solid #d0d7de;"> 
   </li>
   <li>
     <strong>使用文中注释实现精细问答</strong><br>
