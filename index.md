@@ -8,6 +8,76 @@ title: 大伟的AI学习日志
   .ai-steps li { counter-increment: step; list-style: none; margin-bottom: 1em; padding-left: 2.5em; position: relative; }
   .ai-steps li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 1.8em; height: 1.8em; background: #0969da; color: #fff; border-radius: 50%; text-align: center; line-height: 1.8em; font-weight: 600; font-size: 0.85em; }
   hr { border: 0; border-top: 1px solid #d0d7de; margin: 2em 0; }
+
+  /* 文章卡片列表 */
+  .post-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75em;
+    margin: 1.2em 0;
+  }
+  .post-card {
+    background: #fff;
+    border: 1px solid #e8eaed;
+    border-radius: 10px;
+    padding: 1em 1.3em;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    display: flex;
+    align-items: center;
+    gap: 1em;
+  }
+  .post-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(9,105,218,0.08), 0 1px 3px rgba(0,0,0,0.03);
+    border-color: #b6c8e5;
+  }
+  .post-card-icon {
+    font-size: 1.5em;
+    flex-shrink: 0;
+    width: 1.6em;
+    text-align: center;
+  }
+  .post-card-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .post-card-title {
+    font-weight: 650;
+    font-size: 1em;
+    line-height: 1.45;
+    margin-bottom: 0.15em;
+  }
+  .post-card-title a {
+    color: #1a1a2e;
+    text-decoration: none;
+  }
+  .post-card-title a:hover {
+    color: #0969da;
+  }
+  .post-card-desc {
+    font-size: 0.87em;
+    color: #656d76;
+    line-height: 1.55;
+  }
+  .post-card-meta {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25em;
+    font-size: 0.78em;
+    color: #8b949e;
+  }
+  .post-card-tag {
+    display: inline-block;
+    background: #eef3fb;
+    color: #0550ae;
+    border-radius: 20px;
+    padding: 0.12em 0.65em;
+    font-size: 0.85em;
+    font-weight: 500;
+    white-space: nowrap;
+  }
 </style>
 
 # 大伟的AI学习日志
@@ -16,13 +86,107 @@ title: 大伟的AI学习日志
 
 ## 文章目录
 
-- [机器学习快速入门——数学部分](blogs/math-primer-for-ml)（约 1.6 万字）
-- [Diffusion 模型的数学主线：从马尔可夫链到概率流](blogs/diffusion-math)（约 1.9 万字）
-- [YOLO 目标检测算法：一文读懂十年演进 (2015–2026)](blogs/YOLO-Complete-Learning-Guide)（约 3.2 万字）
-- [MLA 双模式深度专题：MHA 模式 vs MQA 模式](blogs/mla_modes_deep_dive)（约 0.3 万字）
-- [DeepSeek-V4 注意力机制深度解析](blogs/dsv4_att)（约 0.9 万字）
-- [世界模型综述：从像素之梦到表征理解（2018–2026）](blogs/world-models-survey)（约 3.6 万字）
-- [思维链：从提示工程到推理时训练](blogs/cot-survey)（约 1.8 万字）
+<div class="post-list">
+
+  <a href="blogs/math-primer-for-ml" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-icon">📐</div>
+    <div class="post-card-body">
+      <div class="post-card-title">机器学习快速入门——数学部分</div>
+      <div class="post-card-desc">线性代数、概率论、微积分与优化理论的 ML 核心数学速览，从向量矩阵推进到反向传播与梯度下降。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 1.6 万字</span>
+      <span>基础入门</span>
+    </div>
+  </div>
+  </a>
+
+  <a href="blogs/diffusion-math" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-icon">🎨</div>
+    <div class="post-card-body">
+      <div class="post-card-title">Diffusion 模型的数学主线</div>
+      <div class="post-card-desc">从 DDPM 马尔可夫链到 Score-based SDE，再到概率流 ODE——完整推导扩散模型的数学骨架。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 1.9 万字</span>
+      <span>生成模型</span>
+    </div>
+  </div>
+  </a>
+
+  <a href="blogs/YOLO-Complete-Learning-Guide" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-icon">🎯</div>
+    <div class="post-card-body">
+      <div class="post-card-title">YOLO 目标检测：十年演进 2015–2026</div>
+      <div class="post-card-desc">从 YOLOv1 网格划分到 YOLO26 端到端革新，架构迭代、标签分配、损失函数与训练技巧的系统梳理。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 3.2 万字</span>
+      <span>目标检测</span>
+    </div>
+  </div>
+  </a>
+
+  <a href="blogs/mla_modes_deep_dive" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-icon">⚡</div>
+    <div class="post-card-body">
+      <div class="post-card-title">MLA 双模式深度专题</div>
+      <div class="post-card-desc">MHA 模式 vs MQA 模式，深入 KV cache 压缩原理与推理加速的关键设计决策。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 0.3 万字</span>
+      <span>注意力机制</span>
+    </div>
+  </div>
+  </a>
+
+  <a href="blogs/dsv4_att" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-icon">🧠</div>
+    <div class="post-card-body">
+      <div class="post-card-title">DeepSeek-V4 注意力机制深度解析</div>
+      <div class="post-card-desc">拆解稀疏注意力、NSA 算子与 MLA 融合，理解长上下文低开销背后的工程取舍。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 0.9 万字</span>
+      <span>LLM 架构</span>
+    </div>
+  </div>
+  </a>
+
+  <a href="blogs/world-models-survey" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-icon">🌍</div>
+    <div class="post-card-body">
+      <div class="post-card-title">世界模型综述：从像素之梦到表征理解</div>
+      <div class="post-card-desc">Dreamer 系列到 Transformer-based 世界模型，latent dynamics、tokenized state 与 3D-aware 三大范式全景梳理。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 3.6 万字</span>
+      <span>综述</span>
+    </div>
+  </div>
+  </a>
+
+  <a href="blogs/cot-survey" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-icon">🔗</div>
+    <div class="post-card-body">
+      <div class="post-card-title">思维链：从提示工程到推理时训练</div>
+      <div class="post-card-desc">从 Few-shot CoT 到 DeepSeek-R1 推理时强化学习，LLM 推理能力从 Prompt 技巧到训练范式的跃迁。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 1.8 万字</span>
+      <span>LLM 推理</span>
+    </div>
+  </div>
+  </a>
+
+</div>
 
 ---
 
