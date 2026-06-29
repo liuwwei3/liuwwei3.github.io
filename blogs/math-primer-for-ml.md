@@ -762,20 +762,18 @@ $$\mathbf{W} \approx \mathbf{U}_r \boldsymbol{\Sigma}_r \mathbf{V}_r^T$$
 
 > **看图要点：** 这是一张全景知识地图——所有数学概念用彩色节点按三大领域分组（蓝色=线性代数，红色=概率论，绿色=微积分/优化）。带文字的箭头表示跨领域联系（如「矩阵×向量→分数→概率」串起了线性代数和概率论，「驱动优化」和「更新参数」形成了微分→优化的闭环）。节点之间的连线密度反映了学科交织的深度——线性代数提供数据表示，概率论处理不确定性，微积分驱动学习。下方列出了五个主要博客主题及其依赖的数学工具组合，帮你建立「这篇博客大概需要什么数学」的快速索引。
 
-| 数学概念 | 博客中的典型应用 | 常见符号 |
-|----------|-----------------|---------|
-| **向量** | 词嵌入、图像展平、潜在表示 | $\mathbf{x}$, $\mathbf{z}$, $\mathbf{h}$ |
-| **矩阵乘法** | 全连接层、注意力中的 $\mathbf{Q}\mathbf{K}^T$ | $\mathbf{W}\mathbf{x}$, $\mathbf{Q}\mathbf{K}^T$ |
-| **Softmax** | 注意力权重归一化、分类输出 | $\text{softmax}(\mathbf{Q}\mathbf{K}^T/\sqrt{d_k})$ |
-| **梯度** $\nabla$ | 损失优化、扩散得分函数 | $\nabla_{\theta}\mathcal{L}$, $\nabla_{\mathbf{x}}\log p$ |
-| **期望** $\mathbb{E}$ | 损失定义、概率生成 | $\mathbb{E}_{\mathbf{x} \sim p}[\cdot]$ |
-| **高斯分布** | VAE 潜在变量、扩散噪声 | $\mathcal{N}(\mu, \sigma^2)$, $\mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma})$ |
-| **KL 散度** | VAE、扩散、PPO/GRPO | $D_{\text{KL}}(q \parallel p)$ |
-| **交叉熵** | 分类损失、语言模型训练 | $H(p, q)$, $\mathcal{L}_{\text{CE}}$ |
-| **链式法则** | 反向传播 | $\frac{\partial \mathcal{L}}{\partial x} = \frac{\partial \mathcal{L}}{\partial y}\frac{\partial y}{\partial x}$ |
-| **ODE / SDE** | 扩散模型理论、Flow Matching | $\frac{d\mathbf{x}}{dt}$, $d\mathbf{x}= \dots dt + \dots dW$ |
-| **贝叶斯公式** | 变分推断、后验推导 | $P(A\mid B) \propto P(B\mid A)P(A)$ |
-| **SVD / 低秩** | LoRA 微调、MLA 高效注意力 | $\mathbf{W} = \mathbf{U}\boldsymbol{\Sigma}\mathbf{V}^T$ |
+- **向量** — 词嵌入、图像展平、潜在表示。常见记号：$\mathbf{x}$, $\mathbf{z}$, $\mathbf{h}$
+- **矩阵乘法** — 全连接层、注意力中的 $\mathbf{Q}\mathbf{K}^T$。常见记号：$\mathbf{W}\mathbf{x}$, $\mathbf{Q}\mathbf{K}^T$
+- **Softmax** — 注意力权重归一化、分类输出。常见记号：$\text{softmax}(\mathbf{Q}\mathbf{K}^T/\sqrt{d_k})$
+- **梯度 $\nabla$** — 损失优化、扩散得分函数。常见记号：$\nabla_{\theta}\mathcal{L}$, $\nabla_{\mathbf{x}}\log p$
+- **期望 $\mathbb{E}$** — 损失定义、概率生成。常见记号：$\mathbb{E}_{\mathbf{x} \sim p}[\cdot]$
+- **高斯分布** — VAE 潜在变量、扩散噪声。常见记号：$\mathcal{N}(\mu, \sigma^2)$, $\mathcal{N}(\boldsymbol{\mu}, \boldsymbol{\Sigma})$
+- **KL 散度** — VAE、扩散、PPO/GRPO。常见记号：$D_{\text{KL}}(q \parallel p)$
+- **交叉熵** — 分类损失、语言模型训练。常见记号：$H(p, q)$, $\mathcal{L}_{\text{CE}}$
+- **链式法则** — 反向传播。常见记号：$\frac{\partial \mathcal{L}}{\partial x} = \frac{\partial \mathcal{L}}{\partial y}\frac{\partial y}{\partial x}$
+- **ODE / SDE** — 扩散模型理论、Flow Matching。常见记号：$\frac{d\mathbf{x}}{dt}$, $d\mathbf{x}= \dots dt + \dots dW$
+- **贝叶斯公式** — 变分推断、后验推导。常见记号：$P(A\mid B) \propto P(B\mid A)P(A)$
+- **SVD / 低秩** — LoRA 微调、MLA 高效注意力。常见记号：$\mathbf{W} = \mathbf{U}\boldsymbol{\Sigma}\mathbf{V}^T$
 
 ---
 
