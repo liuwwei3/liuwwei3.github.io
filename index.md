@@ -53,9 +53,6 @@ title: 大伟的AI学习日志
 <ul class="blog-list">
   <li>
     <span class="title"><a href="blogs/math-primer-for-ml">机器学习快速入门——数学部分</a></span><span class="meta">约 1.6 万字</span>
-    <div class="desc"></div>
-  </li>
-  <li>
     <div class="desc">线性代数 + 概率论 + 微积分三合一。读完就能看懂 Transformer、扩散模型、世界模型等博客里的数学符号。</div>
   </li>
   <li>
