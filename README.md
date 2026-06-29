@@ -4,7 +4,10 @@
 
 ## 文章目录
 
-- [机器学习快速入门——数学部分](blogs/math-primer-for-ml)（约 1.6 万字）
+  <li>
+    <span class="title"><a href="blogs/math-primer-for-ml">机器学习快速入门——数学部分</a></span><span class="meta">约 1.6 万字</span>
+    <div class="desc"></div>
+  </li>
 - [Diffusion 模型的数学主线：从马尔可夫链到概率流](blogs/diffusion-math)（约 1.9 万字）
 - [YOLO 目标检测算法：一文读懂十年演进 (2015-2026)](blogs/YOLO-Complete-Learning-Guide)（约 3.2 万字）
 - [MLA 双模式深度专题：MHA 模式 vs MQA 模式](blogs/mla_modes_deep_dive)（约 0.3 万字）
