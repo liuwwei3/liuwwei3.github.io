@@ -258,7 +258,7 @@ def build_article(source_content: str, title: str) -> str:
 
 
 def update_index(path: Path, entry: str, dry_run: bool) -> bool:
-    """Insert entry into index file under ## 博客 heading. Returns True if updated."""
+    """Insert entry into index file under ## 文章目录 (or ## 博客) heading. Returns True if updated."""
     try:
         with open(path, encoding='utf-8') as f:
             content = f.read()
@@ -269,25 +269,29 @@ def update_index(path: Path, entry: str, dry_run: bool) -> bool:
     lines = content.splitlines()
     blog_idx = None
     for i, line in enumerate(lines):
-        if line.strip() == '## 博客':
+        if line.strip().startswith('## 文章目录') or line.strip().startswith('## 博客'):
             blog_idx = i
             break
 
     if blog_idx is None:
-        print(json.dumps({"status": "error", "message": "## 博客 section not found in index"}), file=sys.stderr)
+        print(json.dumps({"status": "error", "message": "## 文章目录 / ## 博客 section not found in index"}), file=sys.stderr)
         return False
 
     # Remove existing duplicate entries with the same slug
-    # Entry format: '- [...](blogs/<slug>)...'
+    # Matches both old `- [title](blogs/<slug>)...` and new `<li>...href="blogs/<slug>"</li>` styles
     slug = entry.split('](blogs/')[1].split(')')[0] if '](blogs/' in entry else ''
-    lines = [l for l in lines if f'(blogs/{slug})' not in l]
+    if slug:
+        lines = [l for l in lines if f'blogs/{slug}' not in l]
 
-    # Find the first list item after ## 博客
+    # Find the start of the post list (after the ## heading and optional blank lines)
     insert_at = blog_idx + 1
     while insert_at < len(lines) and lines[insert_at].strip() == '':
         insert_at += 1
+    # Skip the <ul class="blog-list"> opening tag if present
+    if insert_at < len(lines) and '<ul class="blog-list">' in lines[insert_at]:
+        insert_at += 1
 
-    # Insert new entry at the front of the list
+    # Insert new entry at the front of the list (plain markdown link line for README)
     lines.insert(insert_at, entry)
 
     if not dry_run:
@@ -389,9 +393,9 @@ def main():
     cc = total_word_count(body_only)
     wc_display = format_wc(cc)
 
-    # Entry line for README
+    # Entry line for index — new HTML list-item style
     slug = os.path.splitext(filename)[0]
-    entry = f"- [{title}](blogs/{slug})（{wc_display}）"
+    entry = f'- [{title}](blogs/{slug})（{wc_display}）'
 
     # Execute
     if not args.dry_run:

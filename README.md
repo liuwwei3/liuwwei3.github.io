@@ -1,6 +1,8 @@
-# 戴维刘的blog
+# 大伟的AI学习日志
 
-## 博客
+建议 clone 后用 AI Agent 辅助阅读，详见[主页](https://liuwwei3.github.io)。
+
+## 文章目录
 
 - [机器学习快速入门——数学部分](blogs/math-primer-for-ml)（约 1.6 万字）
 - [Diffusion 模型的数学主线：从马尔可夫链到概率流](blogs/diffusion-math)（约 1.9 万字）
