@@ -397,15 +397,9 @@ def main():
     cc = total_word_count(body_only)
     wc_display = format_wc(cc)
 
-    # Entry line for index — HTML list-item style (matching index.md format)
+    # Entry line for index — single-line <li> to avoid line-splitting issues
     slug = os.path.splitext(filename)[0]
-    entry = (
-        f'  <li>\n'
-        f'    <span class="title"><a href="blogs/{slug}">{title}</a></span>'
-        f'<span class="meta">{wc_display}</span>\n'
-        f'    <div class="desc"></div>\n'
-        f'  </li>'
-    )
+    entry = f'<li><span class="title"><a href="blogs/{slug}">{title}</a></span><span class="meta">{wc_display}</span><div class="desc"></div></li>'
 
     # Execute
     if not args.dry_run:
