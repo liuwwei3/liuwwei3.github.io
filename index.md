@@ -23,27 +23,27 @@ title: 大伟的AI学习日志
 
 ## 建议使用 AI Agent 阅读
 
-这个仓库最适合的打开方式是：**用 VS Code 把文章下载到本地，配合 AI Agent 逐段精读。** 你不需要一开始就全部看懂——选中不懂的段落，直接向 AI 提问。
+这个仓库最适合的打开方式是：**用 VS Code + Claude Code 把文章下载到本地，逐段精读。** 你不需要安装 git、不需要懂命令行——全程在 VS Code 里用自然语言对话就能完成。
 
-### 三步开始
+### 两步开始
 
 <ol class="ai-steps">
   <li>
-    <strong>Clone 仓库并用 VS Code 打开</strong><br>
-    <code>git clone https://github.com/liuwwei3/liuwwei3.github.io.git</code><br>
-    <code>cd liuwwei3.github.io</code>，然后用 VS Code 打开该文件夹。
+    <strong>安装 VS Code 并配置 Claude Code</strong><br>
+    下载安装 <a href="https://code.visualstudio.com/">VS Code</a>，然后在 VS Code 的扩展商店中搜索并安装 <code>Claude Code</code> 插件和 <code>Markdown Preview Enhanced</code> 插件（后者用于漂亮的 Markdown 渲染预览）。安装后重启 VS Code。
+    <br><br>配置完成之后，工作界面如下：<br>
+    <img src="vscode-read-config.jpeg" alt="VS Code 工作界面" style="max-width:100%; border-radius:8px; margin-top:0.4em; border:1px solid #d0d7de;">
   </li>
   <li>
-    <strong>安装 AI 插件</strong><br>
-    推荐以下方式：<br>
-    <strong>VS Code + Claude Code</strong> — 在 VS Code 终端中安装 <code>claude code</code>插件以及<code>Markdown Preview Enhanced</code>插件，Claude code会自动加载仓库中的 <code>CLAUDE.md</code> 获得上下文，然后你直接选中 <code>blogs/</code> 下的文章开始对话。VS Code 原生集成Copilot，打开 <code>.md</code> 文件，选中不懂的段落，<code>Ctrl+I</code>（Mac: <code>Cmd+I</code>）直接提问。<br>
-    <br>配置完成之后，工作界面如下：<br>
-    <img src="vscode-read-config.jpeg" alt="VS Code 工作界面" style="max-width:100%; border-radius:8px; margin-top:0.4em; border:1px solid #d0d7de;"> 
+    <strong>用 Claude Code 一键获取文章</strong><br>
+    在 VS Code 中打开 Claude Code 对话面板，输入：<br>
+    <code>请帮我 clone 仓库 https://github.com/liuwwei3/liuwwei3.github.io.git 到一个本地文件夹，然后用 VS Code 打开它</code><br>
+    Claude Code 会自动执行 git clone、创建文件夹、打开仓库。完成后，你就可以在 <code>blogs/</code> 目录下看到所有文章了。选中 <code>.md</code> 文件，用 <code>Ctrl+K V</code>（Mac: <code>Cmd+K V</code>）开启 Markdown 预览，边看边向 Claude Code 提问。
   </li>
   <li>
     <strong>使用文中注释实现精细问答</strong><br>
-    本项目的每篇文章都天然适合 AI 辅助阅读——你可以在阅读时用自然语言向 AI 提问。更进一步，你<span style="background:#fff3cd;padding:0 4px;">可以在任意段落后插入 HTML 注释 <code>&lt;!--你的问题--&gt;</code></span>，然后让 AI Agent 逐条解答。<br>
-    例如在不容易理解的部分后面加一行：<code>&lt;!--这里为什么用 log 而不是线性惩罚？--&gt;</code>，然后对 Agent 说「找出文中所有注释并解答」。
+    本项目的每篇文章都天然适合 AI 辅助阅读——你可以在阅读时用自然语言向 AI 提问。更进一步，你<span style="background:#fff3cd;padding:0 4px;">可以在任意段落后插入 HTML 注释 <code>&lt;!--你的问题--&gt;</code></span>，然后让 Claude Code 逐条解答。<br>
+    例如在不容易理解的部分后面加一行：<code>&lt;!--这里为什么用 log 而不是线性惩罚？--&gt;</code>，然后对 Claude Code 说「找出文中所有注释并解答」。
   </li>
 </ol>
 
