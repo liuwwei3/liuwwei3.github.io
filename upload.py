@@ -278,8 +278,12 @@ def update_index(path: Path, entry: str, dry_run: bool) -> bool:
         return False
 
     # Remove existing duplicate entries with the same slug
-    # Matches both old `- [title](blogs/<slug>)...` and new `<li>...href="blogs/<slug>"</li>` styles
-    slug = entry.split('](blogs/')[1].split(')')[0] if '](blogs/' in entry else ''
+    # Matches old `- [title](blogs/<slug>)` and new `href="blogs/<slug>"` styles
+    slug = ''
+    if 'href="blogs/' in entry:
+        slug = entry.split('href="blogs/')[1].split('"')[0]
+    elif '](blogs/' in entry:
+        slug = entry.split('](blogs/')[1].split(')')[0]
     if slug:
         lines = [l for l in lines if f'blogs/{slug}' not in l]
 
@@ -393,9 +397,15 @@ def main():
     cc = total_word_count(body_only)
     wc_display = format_wc(cc)
 
-    # Entry line for index — new HTML list-item style
+    # Entry line for index — HTML list-item style (matching index.md format)
     slug = os.path.splitext(filename)[0]
-    entry = f'- [{title}](blogs/{slug})（{wc_display}）'
+    entry = (
+        f'  <li>\n'
+        f'    <span class="title"><a href="blogs/{slug}">{title}</a></span>'
+        f'<span class="meta">{wc_display}</span>\n'
+        f'    <div class="desc"></div>\n'
+        f'  </li>'
+    )
 
     # Execute
     if not args.dry_run:
