@@ -269,33 +269,25 @@ def update_index(path: Path, entry: str, dry_run: bool) -> bool:
     lines = content.splitlines()
     blog_idx = None
     for i, line in enumerate(lines):
-        if line.strip().startswith('## 文章目录') or line.strip().startswith('## 博客'):
+        if line.strip().startswith('## 文章目录') or line.strip() == '## 文章目录':
             blog_idx = i
             break
 
     if blog_idx is None:
-        print(json.dumps({"status": "error", "message": "## 文章目录 / ## 博客 section not found in index"}), file=sys.stderr)
+        print(json.dumps({"status": "error", "message": "## 文章目录 section not found in index"}), file=sys.stderr)
         return False
 
     # Remove existing duplicate entries with the same slug
-    # Matches old `- [title](blogs/<slug>)` and new `href="blogs/<slug>"` styles
-    slug = ''
-    if 'href="blogs/' in entry:
-        slug = entry.split('href="blogs/')[1].split('"')[0]
-    elif '](blogs/' in entry:
-        slug = entry.split('](blogs/')[1].split(')')[0]
+    slug = entry.split('](blogs/')[1].split(')')[0] if '](blogs/' in entry else ''
     if slug:
         lines = [l for l in lines if f'blogs/{slug}' not in l]
 
-    # Find the start of the post list (after the ## heading and optional blank lines)
+    # Find the first list item after ## 文章目录
     insert_at = blog_idx + 1
     while insert_at < len(lines) and lines[insert_at].strip() == '':
         insert_at += 1
-    # Skip the <ul class="blog-list"> opening tag if present
-    if insert_at < len(lines) and '<ul class="blog-list">' in lines[insert_at]:
-        insert_at += 1
 
-    # Insert new entry at the front of the list (plain markdown link line for README)
+    # Insert new entry at the front of the list
     lines.insert(insert_at, entry)
 
     if not dry_run:
@@ -397,9 +389,9 @@ def main():
     cc = total_word_count(body_only)
     wc_display = format_wc(cc)
 
-    # Entry line for index — single-line <li> to avoid line-splitting issues
+    # Entry line for index — plain markdown link
     slug = os.path.splitext(filename)[0]
-    entry = f'<li><span class="title"><a href="blogs/{slug}">{title}</a></span><span class="meta">{wc_display}</span><div class="desc"></div></li>'
+    entry = f'- [{title}](blogs/{slug})（{wc_display}）'
 
     # Execute
     if not args.dry_run:
