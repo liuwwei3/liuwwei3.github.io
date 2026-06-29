@@ -30,8 +30,13 @@ title: 大伟的AI学习日志
 <ol class="ai-steps">
   <li>
     <strong>安装 VS Code 并配置 Claude Code</strong><br>
-    下载安装 <a href="https://code.visualstudio.com/">VS Code</a>，然后在 VS Code 的扩展商店中搜索并安装 <code>Claude Code</code> 插件和 <code>Markdown Preview Enhanced</code> 插件（后者用于漂亮的 Markdown 渲染预览）。安装后重启 VS Code。
-    <br><br>配置完成之后，工作界面如下：<br>
+    <strong>①</strong> 下载安装 <a href="https://code.visualstudio.com/">VS Code</a>。<br>
+    <strong>②</strong> Claude Code 依赖 Node.js：到 <a href="https://nodejs.org/">nodejs.org</a> 下载安装 LTS 版本（一路点 Next 即可）。<br>
+    <strong>③</strong> 打开 VS Code 的终端（<code>Ctrl+`</code> 或 Mac: <code>Cmd+`</code>），输入以下命令安装 Claude Code CLI：<br>
+    <code>npm install -g @anthropic-ai/claude-code</code><br>
+    <strong>④</strong> 在 VS Code 扩展商店（<code>Ctrl+Shift+X</code>）搜索并安装 <a href="https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code">Claude Code</a>（发布者 Anthropic，标识符 <code>anthropic.claude-code</code>）和 <code>Markdown Preview Enhanced</code>（用于漂亮的文章渲染预览）。重启 VS Code。<br>
+    <strong>⑤</strong> 首次使用时需要登录 Anthropic 账号（需订阅 Pro / Max 或配置 API Key）。点击 VS Code 工具栏的 ✦ 图标，或按 <code>Cmd+Shift+P</code> → 输入 <code>Claude Code: Open</code> 启动。<br>
+    <br>配置完成之后，工作界面如下：<br>
     <img src="vscode-read-config.jpeg" alt="VS Code 工作界面" style="max-width:100%; border-radius:8px; margin-top:0.4em; border:1px solid #d0d7de;">
   </li>
   <li>
