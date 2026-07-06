@@ -1,6 +1,6 @@
 ---
 layout: default
-title: Davi Liu's AI Blogs
+title: "Davi Liu's AI Blogs"
 ---
 
 <style>
