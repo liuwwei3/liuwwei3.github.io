@@ -82,8 +82,6 @@ title: "Davi Liu's AI Blogs"
   .img-lightbox-bg { position: absolute; inset: 0; cursor: default; }
 </style>
 
-<img src="avatar-192.jpeg" alt="Davi Liu" width="96" height="96" style="border-radius:50%;margin-bottom:0.5em;">
-
 # Davi Liu's AI Blogs
 
 ---
