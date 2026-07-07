@@ -82,6 +82,8 @@ title: "Davi Liu's AI Blogs"
   .img-lightbox-bg { position: absolute; inset: 0; cursor: default; }
 </style>
 
+<img src="avatar-192.jpeg" alt="Davi Liu" width="96" height="96" style="border-radius:50%;margin-bottom:0.5em;">
+
 # Davi Liu's AI Blogs
 
 ---
@@ -203,8 +205,7 @@ title: "Davi Liu's AI Blogs"
     注意：配置要写在 Claude Code 自己的配置文件里（<code>~/.claude/settings.json</code>），<strong>不是</strong> VS Code 的 <code>settings.json</code>。后者经常会失效。<br><br>
     <em>Mac：</em>打开终端，运行：<br>
     <code>mkdir -p ~/.claude && touch ~/.claude/settings.json && open ~/.claude/settings.json</code><br>
-    <em>Windows：</em>按 <code>Win+R</code>，输入 <code>cmd</code> 回车，运行：<br>
-    <code>md %USERPROFILE%\\.claude 2>nul & echo {} > %USERPROFILE%\\.claude\\settings.json & start %USERPROFILE%\\.claude\\settings.json</code><br><br>
+    <em>Windows：</em>打开 VS Code，按 <code>Ctrl+O</code>（打开文件），在上方的地址栏中输入 <code>%USERPROFILE%\.claude\settings.json</code> 并回车。如果提示「文件不存在，是否创建」，点击 <strong>创建文件</strong> 即可。<br><br>
     在打开的文件中填入以下内容（把 <code>sk-xxx</code> 换成你的 API Key）：<br>
     <pre style="background:#fff; padding:0.6em 1em; border-radius:4px; border:1px solid #d0d7de; overflow-x:auto;"><code>{
   "env": {
