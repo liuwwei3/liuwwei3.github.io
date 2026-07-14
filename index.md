@@ -165,14 +165,14 @@ title: "Davi Liu's AI Blogs"
   </div>
   </a>
 
-  <a href="blogs/cot-survey" style="text-decoration:none; color:inherit;">
+  <a href="blogs/RL-Tutorial" style="text-decoration:none; color:inherit;">
   <div class="post-card">    <div class="post-card-body">
-      <div class="post-card-title">思维链：从提示工程到推理时训练</div>
-      <div class="post-card-desc">从 Few-shot CoT 到 DeepSeek-R1 推理时强化学习，LLM 推理能力从 Prompt 技巧到训练范式的跃迁。</div>
+      <div class="post-card-title">强化学习：从贝尔曼方程到人类偏好对齐</div>
+      <div class="post-card-desc">从 DQN、PPO、AlphaGo 到 GRPO 和扩散模型 RL，系统性的 RL 入门教程。</div>
     </div>
     <div class="post-card-meta">
-      <span class="post-card-tag">约 1.8 万字</span>
-      <span>LLM 推理</span>
+      <span class="post-card-tag">约 2.9 万字</span>
+      <span>RL 教程</span>
     </div>
   </div>
   </a>
