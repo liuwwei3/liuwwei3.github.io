@@ -88,7 +88,6 @@ title: "Davi Liu's AI Blogs"
 
 ## 文章目录
 
-- [强化学习：从贝尔曼方程到人类偏好对齐](blogs/RL-Tutorial)（约 2.9 万字）
 <div class="post-list">
 
   <a href="blogs/math-primer-for-ml" style="text-decoration:none; color:inherit;">
