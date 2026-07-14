@@ -399,8 +399,8 @@ def main():
         with open(dest_path, 'w', encoding='utf-8') as f:
             f.write(article)
 
-        # Update indexes
-        update_index(INDEX_PATH, entry, False)
+        # Update README index (plain Markdown list, one line per article)
+        # index.md uses HTML cards appended manually — do NOT touch it here
         update_index(README_PATH, entry, False)
 
     # Git
