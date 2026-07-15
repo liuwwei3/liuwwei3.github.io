@@ -228,6 +228,10 @@ def rewrite_paths(content: str) -> str:
 
         return f'[{text}]({slug}{anchor})'
 
+    content = IMAGE_RE.sub(replace_image, content)
+    content = MD_REF_RE.sub(replace_md, content)
+    return content
+
 
 def insert_nav_links(content: str) -> str:
     """Insert [← 回到首页](..) after H1 and at end. Skip if already present."""
