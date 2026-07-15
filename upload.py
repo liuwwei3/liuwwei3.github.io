@@ -186,7 +186,19 @@ def resolve_and_copy(
 
 
 def rewrite_paths(content: str) -> str:
-    """Rewrite local reference paths for blog directory structure."""
+    """Rewrite local reference paths for blog directory structure.
+
+    Strips .md suffix from markdown links (GitHub Pages serves them as HTML),
+    and resolves source filenames to existing blog slugs when they differ.
+    """
+    # Pre-scan: build a mapping from possible source names → existing blog slugs
+    blog_files = {}
+    for f in BLOGS_DIR.iterdir():
+        if f.is_file() and f.suffix == '.md':
+            slug = f.stem  # filename without .md
+            blog_files[f.name] = slug  # e.g., 'world-models-survey.md' → 'world-models-survey'
+            blog_files[slug] = slug   # also map bare slug to itself
+
     def replace_image(match):
         alt, path = match.group(1), match.group(2)
         if path.startswith(('http://', 'https://', '#')):
@@ -203,11 +215,18 @@ def rewrite_paths(content: str) -> str:
             path, anchor = path.split('#', 1)
             anchor = '#' + anchor
         basename = os.path.basename(path)
-        return f'[{text}]({basename}{anchor})'
+        source_stem = basename[:-3] if basename.endswith('.md') else basename
 
-    content = IMAGE_RE.sub(replace_image, content)
-    content = MD_REF_RE.sub(replace_md, content)
-    return content
+        # Resolve to actual blog slug (handles filename differences)
+        source_key = os.path.basename(path)  # e.g., 'world-models-survey-article.md'
+        if source_key in blog_files:
+            slug = blog_files[source_key]
+        elif source_stem in blog_files:
+            slug = blog_files[source_stem]
+        else:
+            slug = source_stem  # fallback: use source stem as-is
+
+        return f'[{text}]({slug}{anchor})'
 
 
 def insert_nav_links(content: str) -> str:
