@@ -1657,7 +1657,7 @@ $$\hat{A}^i = \frac{R(x_0^i, c) - \operatorname{mean}(\{R^j\})}{\operatorname{st
 ### 世界模型
 
 20. Hafner, D. et al. (2024). *Mastering Diverse Domains through World Models.* [arXiv:2301.04104]
-21. 世界模型专题文章：*世界模型：从像素之梦到表征理解（2018–2026）.* 参见 [world-models/world-models-survey-article.md](world-models-survey-article.md)
+21. 世界模型专题文章：*世界模型：从像素之梦到表征理解（2018–2026）.* 参见[世界模型专题文章](world-models-survey-article.md)
 
 ### 人类偏好与对齐
 
