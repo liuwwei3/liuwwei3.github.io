@@ -1499,7 +1499,7 @@ $$A_t^{k-1} = \alpha_k A_t^k - \gamma_k \,\varepsilon_\theta(O_t, A_t^k, k) + \s
 - 可一次性生成整个动作序列的 $T_p$ 步（而非逐步预测）
 - 训练稳定（与需要估计配分函数的能量模型不同）
 
-DDPM 和 DDIM 的完整数学推导（前向加噪过程、反向去噪的变分下界、score function 与噪声预测的等价关系）参见 [Diffusion 模型的数学主线](00-Diffusion-Models-Survey) 和博客中的扩散模型数学专题。
+DDPM 和 DDIM 的完整数学推导（前向加噪过程、反向去噪的变分下界、score function 与噪声预测的等价关系）参见 [Diffusion 模型的数学主线](diffusion-math)。
 
 ### 8.2 DDPO：用 RL 微调扩散模型
 
@@ -1557,7 +1557,7 @@ Flow-GRPO 的解决方案：**给 ODE 加上噪声，转成 SDE（Stochastic Dif
 
 $$dx_t = \big[v_\theta(x_t, t) + \tfrac{\sigma_t^2}{2t}\big(x_t + (1-t)v_\theta(x_t, t)\big)\big]dt + \sigma_t\,dw$$
 
-逐符号拆解：$v_\theta(x_t, t)$ 和 ODE 中的速度场是**同一个网络**，不额外训练；$\sigma_t = a\sqrt{t(1-t)}$ 是注入的噪声强度（$a$ 是超参，控制多少噪声；$\sigma_t$ 在中间时刻最大，两端为 0）；$dw$ 是标准布朗运动增量项（$dw \sim \mathcal{N}(0, dt)$），离散化后变成 $\sigma_t \sqrt{\Delta t}\,\epsilon$，$\epsilon \sim \mathcal{N}(0, I)$——这就是随机性的来源。方括号里的额外项 $\frac{\sigma_t^2}{2t}(x_t + (1-t)v_t)$ 是 SDE 的**漂移修正**——它保证加了噪声之后，边际分布不偏离原来的 ODE 路径。ODE、SDE、DDPM 的数学等价性推导参见 [Diffusion 模型的数学主线](00-Diffusion-Models-Survey) §§2–3。
+逐符号拆解：$v_\theta(x_t, t)$ 和 ODE 中的速度场是**同一个网络**，不额外训练；$\sigma_t = a\sqrt{t(1-t)}$ 是注入的噪声强度（$a$ 是超参，控制多少噪声；$\sigma_t$ 在中间时刻最大，两端为 0）；$dw$ 是标准布朗运动增量项（$dw \sim \mathcal{N}(0, dt)$），离散化后变成 $\sigma_t \sqrt{\Delta t}\,\epsilon$，$\epsilon \sim \mathcal{N}(0, I)$——这就是随机性的来源。方括号里的额外项 $\frac{\sigma_t^2}{2t}(x_t + (1-t)v_t)$ 是 SDE 的**漂移修正**——它保证加了噪声之后，边际分布不偏离原来的 ODE 路径。ODE、SDE、DDPM 的数学等价性推导参见 [Diffusion 模型的数学主线](diffusion-math) §§2–3。
 
 离散化后，SDE 的每一步是：$x_{t+\Delta t} = x_t + \text{确定性漂移项} \cdot \Delta t + \sigma_t \sqrt{\Delta t}\,\epsilon$。有了 $\epsilon$ 注入的随机性，对同一 prompt 用不同噪声种子就能采样出 $G$ 张不同的图像——这就是在线探索的数据来源。而且因为噪声是各向同性高斯，策略 $p_\theta(x_{t-1}|x_t, c)$ 变成了一个显式的高斯分布，概率密度和 KL 散度都有闭式解。
 
