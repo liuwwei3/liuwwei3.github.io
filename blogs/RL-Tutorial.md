@@ -2,7 +2,6 @@
 layout: default
 title: 强化学习：从贝尔曼方程到人类偏好对齐
 ---
-
 # 强化学习：从贝尔曼方程到人类偏好对齐
 [← 回到首页](..)
 
@@ -1076,6 +1075,71 @@ MCTS 维护一棵搜索树，每次模拟从当前棋盘（根节点）出发，
    这两行就是 MCTS 的「学习」——$Q(s,a)$ 始终是所有经过 $(s,a)$ 的模拟的评估值 $V$ 的算术平均。不需要梯度、不需要反向传播、不需要损失函数。每一次模拟只是更新了两列数字表。
 
 一次 MCTS 模拟如上走完四步，耗时约 3-5ms。AlphaGo 在每一步落子前跑约 2000 次模拟（单机版），每次模拟都调用策略网络和价值网络各一次。搜索结束后，选**根节点访问次数最多的动作**落子——不是选 Q 值最高的动作。为什么是访问次数而非最高 Q 值？直觉：如果一个走法真的很好，PUCT 会反复选它——它的高 Q 值吸引它被选中（exploitation），高访问次数又降低它的探索权重，把机会让给其他还没被充分验证的走法。2000 次模拟下来，访问次数的分布会**自动收敛**到一个平衡——好的走法被访问得最多（因为每次选都倾向它），但每个可能与好的候选都被探索过（因为访问越多，越鼓励看别的）。选访问次数最多的动作，等价于选「被 PUCT 反复验证为最值得信赖的走法」——这比单纯选最高 Q 值更鲁棒，因为 Q 值可能只被验证了很少几次。
+
+> **▸ 小专题：MCTS 搜索决策的极简骨架**
+>
+> 下面这段代码展示了 AlphaGo 在每一步落子前执行的 MCTS 主循环。注意循环体只有四大步——选择、扩展、评估、回溯——每一步对应前文解释的一个阶段。`policy_net` 和 `value_net` 是提前训好、参数冻结的网络。
+>
+>```python
+>class MCTSNode:
+>    def __init__(self, state, parent=None, action=None):
+>        self.state = state         # 棋盘局面
+>        self.parent = parent       # 父节点
+>        self.action = action       # 从父节点到达此节点的动作
+>        self.children = {}         # action → MCTSNode
+>        self.N = 0                 # 访问次数 N(s,a)
+>        self.Q = 0.0               # 平均胜率 Q(s,a)
+>        self.P = {}                # 先验概率 P(s,a)，策略网络填充
+>
+># ============ 每一步落子前的主循环 ============
+>root = MCTSNode(current_board)
+># 首次扩展——用策略网络给根节点的各合法动作填充 P
+>with torch.no_grad():
+>    logits = policy_net(current_board)          # 策略网络前向
+>    probs = F.softmax(logits, dim=-1)
+>    for a in legal_actions(current_board):
+>        root.P[a] = probs[a].item()
+>
+>for sim in range(2000):                         # 两千次模拟
+>    node = root
+>    path = [root]                                # 记录走过的路径（用于回溯）
+>
+>    # ── 1. 选择 (Selection) ──
+>    while node.children:                         # 一直走到叶节点
+>        best_a = max(node.children.keys(),
+>            key=lambda a: node.Q.get(a,0) +       # Q(s,a): exploitation
+>                c_puct * node.P[a] *              # P(s,a): 策略网络先验
+>                math.sqrt(sum(node.N.values()))   # √(∑N): 探索缩放
+>                / (1 + node.N.get(a,0)))          # 1+N(s,a): 被已选惩罚
+>        node = node.children[best_a]
+>        path.append(node)
+>
+>    # ── 2. 扩展 (Expansion) ──
+>    if not node.state.is_terminal():             # 还没终局才展开
+>        with torch.no_grad():
+>            logits = policy_net(node.state)
+>            probs = F.softmax(logits, dim=-1)
+>            for a in legal_actions(node.state):
+>                node.P[a] = probs[a].item()
+>
+>    # ── 3. 评估 (Evaluation) ──
+>    with torch.no_grad():
+>        v = value_net(node.state).item()         # 价值网络: v ∈ [-1, 1]
+>    # 注: AlphaGo 原版还混合了快速走子 rollout，这里简化为纯网络评估
+>
+>    # ── 4. 回溯 (Backup) ──
+>    for n in path:                               # 从叶到根反向传播
+>        n.N += 1                                 # 访问次数 +1
+>        n.Q = ((n.N - 1) * n.Q + v) / n.N        # 增量更新平均胜率
+>
+># ============ 搜索结束，决策 ============
+># 选根节点访问次数最多的动作
+>best_action = max(root.children.keys(),
+>                  key=lambda a: root.children[a].N)
+>return best_action
+>```
+>
+> 注意 PUCT 选择循环中 `while node.children`——它沿着已展开的树枝一路前进，走到第一个没有子节点的局面才停下。那一步就是「扩展」要处理的地方：调用一次策略网络，把这个局面的所有合法子节点挂上去（但不立刻评估——下一轮模拟过来时它们就会被选到了）。回溯的 `for n in path` 是 MCTS 唯一的「学习」——不涉及任何梯度，只是沿路径把 $V$ 往上加进各节点的 $Q$ 里。
 
 **结果**：分布式 AlphaGo 以 5:0 击败欧洲围棋冠军樊麾，成为首个在无让子完整围棋中击败人类职业选手的计算机程序。它的成功秘诀可以归结为一句话：**神经网络提供受过训练的直觉（哪里值得看、局面好不好），MCTS 用这些直觉引导系统性的搜索（把有限的计算预算聚焦在最可能通往胜利的分支上），两者互补，缺一不可。**
 
