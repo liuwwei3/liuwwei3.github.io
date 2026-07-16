@@ -273,10 +273,13 @@ def insert_nav_links(content: str) -> str:
 
 def build_article(source_content: str, title: str) -> str:
     """Assemble full blog article with frontmatter and nav links."""
+    # Strip existing frontmatter from source (it may come with its own --- block)
+    if source_content.startswith('---\n'):
+        end = source_content.find('---\n', 4)
+        if end != -1:
+            source_content = source_content[end + 4:].lstrip('\n')
     fm = f'---\nlayout: default\ntitle: {title}\n---\n'
     body = insert_nav_links(source_content)
-    # Remove the original H1 heading from body (frontmatter title serves that role)
-    # Actually keep H1 for visual consistency in the rendered page
     return fm + body
 
 
