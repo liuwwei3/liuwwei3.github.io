@@ -1324,6 +1324,20 @@ MuZero 和 DreamerV3（§4）是 model-based RL 的两条路：
 | 训练/推理不对称 | ✅（训时用模型，推理不用） | ❌（训和推理都依赖模型） |
 | 表达力来源 | 像素重建提供丰富监督 | MCTS 搜索提供深度思考 |
 
+#### 如果去掉 MCTS，MuZero 还剩下多少？
+
+这是一个自然的问题：MuZero 推理时每步跑 50-200 次 MCTS 模拟，每次模拟调用一次 $f_\theta$，总计算量远超纯策略网络的一次前向传播。能不能像 DreamerV3 那样——训完策略网络后就把 MCTS 扔掉？
+
+**MuZero 原始论文的回答**：可以，性能下降但不崩溃。MuZero 论文（Schrittwieser et al., 2019, *Nature* Figure 3B）直接测试了不同 MCTS 模拟次数下的性能——仅用 **1 次模拟（等价于纯策略网络 greedy 选择）**，在 Atari 上仍然表现良好。论文的原话是："Even with a single simulation...MuZero performed well, suggesting that, by the end of training, the raw policy has learned to internalise the benefits of search." 原因在于训练时策略网络的监督目标是 MCTS 的访问次数分布 $\boldsymbol{\pi}$，经过数百万次训练迭代，$\mathbf{p}_\theta$ 已经被 MCTS 反复"蒸馏"——策略网络内化了搜索的很多好处。
+
+但精确的性能损失取决于任务。在需要长程规划的游戏上损失更大（围棋从超人类跌到强业余水平），在反应型游戏上损失很小（如 Pong 几乎没有变化）。
+
+**Muesli（Hessel et al., 2021）——完全不用 MCTS，匹配 MuZero**：这引发了另一个问题：如果改成"训练时也不用 MCTS"呢？DeepMind 的 Muesli 做了这件事。Muesli 完全去掉了 MCTS，训练时只在潜空间做 **one-step lookahead** 来构造策略改进目标，推理时纯策略网络直出动作。在 Atari 57 上，Muesli **匹配了完整 MuZero 的中位数性能**，计算速度降低到 model-free 方法的水平。这证明了**MCTS 对性能不是严格必需的——如果有合适的替代训练方式，它可以被完全替换掉**。
+
+**ROSMO（Liu et al., ICLR 2023）——在 Offline RL 中，MCTS 反而是累赘**：在 offline RL (数据固定，不能在线探索）中，MuZero Unplugged 的 MCTS 会进入数据未覆盖的隐藏状态区域，导致模型外推误差被搜索层层放大。ROSMO 将 MCTS 替换为 **regularized one-step lookahead**，直接在根节点对所有动作做一步价值比较，用行为正则化约束这个比较不越出数据安全区。结果：ROSMO 在 Atari IQM 归一化评分上以 194% vs 151% 超越 MuZero Unplugged，同时训练时间从 17.8 小时缩短到 1 小时（**17× 加速**）。
+
+这三条线合在一起，揭示了一个深层洞察。MCTS 之于 MuZero，就像 Critic 之于 PPO——它在在线/自对弈场景下是最有效的 policy improvement operator，但并非推理必需品。当推理成本是瓶颈时，策略蒸馏可以部分替代 MCTS（MuZero 原始论文的方法）；当数据有限时，浅层 one-step lookahead 可能比深层搜索更安全（ROSMO）；当要完全去掉所有的树搜索时，Muesli 级别的训练方案可以做到性能不降。
+
 两者没有谁压过谁——DreamerV3 在样本效率上无敌（Minecraft 钻石），MuZero 在最终决策质量上更高（Atari 超人类级别的中位数）。最前沿的工作已经在探索把两者合并：用 DreamerV3 的方式训练世界模型，用 MuZero 的方式在模型中推理时展开搜索。
 
 
@@ -1759,26 +1773,28 @@ $$\hat{A}^i = \frac{R(x_0^i, c) - \operatorname{mean}(\{R^j\})}{\operatorname{st
 17. Silver, D. et al. (2016). *Mastering the Game of Go with Deep Neural Networks and Tree Search.* Nature 529, 484–489.
 18. Silver, D. et al. (2017). *Mastering Chess and Shogi by Self-Play with a General Reinforcement Learning Algorithm.* [arXiv:1712.01815]
 19. Schrittwieser, J. et al. (2019). *Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model.* Nature 588, 604–609. [arXiv:1911.08265]
+20. Hessel, M. et al. (2021). *Muesli: Combining Improvements in Policy Optimization.* [arXiv:2104.06159]
+21. Liu, Z. et al. (2023). *Efficient Offline Policy Optimization with a Learned Model (ROSMO).* ICLR 2023. [arXiv:2210.05980]
 
 ### 世界模型
 
-20. Hafner, D. et al. (2024). *Mastering Diverse Domains through World Models.* [arXiv:2301.04104]
-21. 世界模型专题文章：*世界模型：从像素之梦到表征理解（2018–2026）.* 参见[世界模型专题文章](https://liuwwei3.github.io/blogs/world-models-survey)
+22. Hafner, D. et al. (2024). *Mastering Diverse Domains through World Models.* [arXiv:2301.04104]
+23. 世界模型专题文章：*世界模型：从像素之梦到表征理解（2018–2026）.* 参见[世界模型专题文章](https://liuwwei3.github.io/blogs/world-models-survey)
 
 ### 人类偏好与对齐
 
-22. Christiano, P. et al. (2017). *Deep Reinforcement Learning from Human Preferences.* NeurIPS 2017. [arXiv:1706.03741]
-23. Ouyang, L. et al. (2022). *Training Language Models to Follow Instructions with Human Feedback.* NeurIPS 2022. [arXiv:2203.02155]
+24. Christiano, P. et al. (2017). *Deep Reinforcement Learning from Human Preferences.* NeurIPS 2017. [arXiv:1706.03741]
+25. Ouyang, L. et al. (2022). *Training Language Models to Follow Instructions with Human Feedback.* NeurIPS 2022. [arXiv:2203.02155]
 
 ### GRPO 与推理
 
-24. Shao, Z. et al. (2024). *DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models.* [arXiv:2402.03300] — **GRPO 原始论文**
-25. Guo, D. et al. (2025). *DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning.* [arXiv:2501.12948]
+26. Shao, Z. et al. (2024). *DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models.* [arXiv:2402.03300] — **GRPO 原始论文**
+27. Guo, D. et al. (2025). *DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning.* [arXiv:2501.12948]
 
 ### 扩散模型 RL
 
-26. Chi, C. et al. (2023). *Diffusion Policy: Visuomotor Policy Learning via Action Diffusion.* RSS / IJRR. [arXiv:2303.04137]
-27. Black, K. et al. (2023). *Training Diffusion Models with Reinforcement Learning.* [arXiv:2305.13301] — **DDPO 论文**
-28. Liu, J. et al. (2025). *Flow-GRPO: Training Flow Matching Models via Online RL.* NeurIPS 2025.
+28. Chi, C. et al. (2023). *Diffusion Policy: Visuomotor Policy Learning via Action Diffusion.* RSS / IJRR. [arXiv:2303.04137]
+29. Black, K. et al. (2023). *Training Diffusion Models with Reinforcement Learning.* [arXiv:2305.13301] — **DDPO 论文**
+30. Liu, J. et al. (2025). *Flow-GRPO: Training Flow Matching Models via Online RL.* NeurIPS 2025.
 
 [← 回到首页](..)
