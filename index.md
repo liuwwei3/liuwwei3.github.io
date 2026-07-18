@@ -170,7 +170,7 @@ title: "Davi Liu's AI Blogs"
       <div class="post-card-desc">从 DQN、PPO、AlphaGo 到 GRPO 和扩散模型 RL，系统性的 RL 入门教程。</div>
     </div>
     <div class="post-card-meta">
-      <span class="post-card-tag">约 3.3 万字</span>
+      <span class="post-card-tag">约 3.4 万字</span>
       <span>RL 教程</span>
     </div>
   </div>
