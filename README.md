@@ -4,7 +4,6 @@
 
 ## 文章目录
 
-- [大语言模型技术梳理：架构、训练、对齐与部署](blogs/llm-tutorial)（约 13.3 万字）
 - [强化学习：从贝尔曼方程到人类偏好对齐](blogs/RL-Tutorial)（约 3.4 万字）
 - [机器学习快速入门——数学部分](blogs/math-primer-for-ml)（约 1.6 万字）
 - [Diffusion 模型的数学主线：从马尔可夫链到概率流](blogs/diffusion-math)（约 1.9 万字）
