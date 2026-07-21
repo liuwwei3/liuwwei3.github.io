@@ -90,6 +90,19 @@ title: "Davi Liu's AI Blogs"
 
 <div class="post-list">
 
+  <a href="blogs/llm-tutorial" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">大语言模型技术梳理：架构、训练、对齐与部署</div>
+      <div class="post-card-desc">从 Transformer 到 GPT、LLaMA、DeepSeek，覆盖架构演进、Scaling Laws、RLHF/DPO、Flash Attention、量化与推理部署的全栈梳理。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 13.3 万字</span>
+      <span>大语言模型</span>
+    </div>
+  </div>
+  </a>
+
   <a href="blogs/math-primer-for-ml" style="text-decoration:none; color:inherit;">
   <div class="post-card">
     <div class="post-card-body">
