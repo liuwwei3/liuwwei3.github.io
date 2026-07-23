@@ -83,8 +83,8 @@ title: "Davi Liu's AI Blogs"
 </style>
 
 <div style="display:flex; align-items:center; justify-content:center; gap:4em; margin:3em 0 4em 0;">
-  <img src="/logo.jpeg" style="width:600px;height:600px;border-radius:50%;object-fit:cover;max-width:45vw;flex-shrink:0;">
-  <h1 style="margin:0; font-size:3.5em; white-space:nowrap;">Davi Liu's AI Blogs</h1>
+  <img src="/logo.jpeg" style="width:45vw;max-width:700px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+  <h1 style="margin:0; font-size:2.2em; white-space:nowrap;">Davi Liu's AI Blogs</h1>
 </div>
 
 ---
