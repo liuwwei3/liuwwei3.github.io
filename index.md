@@ -183,7 +183,8 @@ title: "Davi Liu's AI Blogs"
 
 ---
 
-## 建议使用 AI Agent 阅读
+<details style="margin:1.5em 0;">
+<summary style="font-size:1.3em; font-weight:600; cursor:pointer;">📖 建议使用 AI Agent 阅读</summary>
 
 这个仓库最适合的打开方式是：**用 VS Code + Claude Code 把文章下载到本地，逐段精读。** 你不需要安装 git、不需要懂命令行——全程在 VS Code 里用自然语言对话就能完成。
 
@@ -239,6 +240,8 @@ title: "Davi Liu's AI Blogs"
   </li>
 
 </ol>
+
+</details>
 
 <!-- 图片灯箱浮层 -->
 <div class="img-lightbox" id="img-vscode-setup">
