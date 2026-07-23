@@ -82,9 +82,12 @@ title: "Davi Liu's AI Blogs"
   .img-lightbox-bg { position: absolute; inset: 0; cursor: default; }
 </style>
 
-<div style="display:flex; align-items:center; justify-content:center; gap:1.2em; margin-bottom:1.5em;">
-  <img src="/logo.jpeg" style="width:100px;height:100px;border-radius:50%;object-fit:cover;">
-  <h1 style="margin:0; font-size:2em;">Davi Liu's AI Blogs</h1>
+<div style="display:flex; align-items:center; justify-content:center; gap:2em; margin:2em 0 2.5em 0;">
+  <img src="/logo.jpeg" style="width:140px;height:140px;border-radius:50%;object-fit:cover;">
+  <div>
+    <h1 style="margin:0; font-size:2.4em; line-height:1.2;">Davi Liu's AI Blogs</h1>
+    <p style="margin:0.3em 0 0 0; color:#656d76; font-size:1em;">大语言模型 · 强化学习 · 计算机视觉</p>
+  </div>
 </div>
 
 ---
