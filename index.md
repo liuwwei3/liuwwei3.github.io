@@ -106,6 +106,19 @@ title: "Davi Liu's AI Blogs"
   </div>
   </a>
 
+  <a href="blogs/nn-engineering-basics" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">神经网络工程基础：PyTorch 训练框架与核心算子</div>
+      <div class="post-card-desc">从 Tensor 和 Autograd 出发，逐一拆解 Linear、Conv、BatchNorm、LayerNorm、Attention 等核心算子的前向公式与梯度，用 MLP 和 CNN 两个示例串起完整训练循环。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 1.5 万字</span>
+      <span>工程基础</span>
+    </div>
+  </div>
+  </a>
+
   <a href="blogs/diffusion-math" style="text-decoration:none; color:inherit;">
   <div class="post-card">
     <div class="post-card-body">
