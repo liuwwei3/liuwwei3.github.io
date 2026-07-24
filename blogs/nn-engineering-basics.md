@@ -1515,4 +1515,3 @@ for x, y in dataloader:
 9. Adam vs AdamW 的区别？—— **权重衰减与自适应学习率解耦**
 10. `torch.no_grad()` 和 `model.eval()` 的区别？—— **no_grad 阻止计算图构建（省显存），eval 改变层行为（Dropout/BN 的开关）**
 
-*全文约 1.5 万字。如果你发现任何错误或有不清晰的地方，欢迎反馈。*
