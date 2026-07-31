@@ -119,6 +119,18 @@ title: "Davi Liu's AI Blogs"
   </div>
   </a>
 
+  <a href="blogs/YOLO-Complete-Learning-Guide" style="text-decoration:none; color:inherit;">
+  <div class="post-card">    <div class="post-card-body">
+      <div class="post-card-title">YOLO 目标检测：十年演进 2015–2026</div>
+      <div class="post-card-desc">从 YOLOv1 网格划分到 YOLO26 端到端革新，架构迭代、标签分配、损失函数与训练技巧的系统梳理。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 3.2 万字</span>
+      <span>目标检测</span>
+    </div>
+  </div>
+  </a>
+
   <a href="blogs/diffusion-math" style="text-decoration:none; color:inherit;">
   <div class="post-card">
     <div class="post-card-body">
@@ -132,14 +144,14 @@ title: "Davi Liu's AI Blogs"
   </div>
   </a>
 
-  <a href="blogs/YOLO-Complete-Learning-Guide" style="text-decoration:none; color:inherit;">
+  <a href="blogs/dsv4_att" style="text-decoration:none; color:inherit;">
   <div class="post-card">    <div class="post-card-body">
-      <div class="post-card-title">YOLO 目标检测：十年演进 2015–2026</div>
-      <div class="post-card-desc">从 YOLOv1 网格划分到 YOLO26 端到端革新，架构迭代、标签分配、损失函数与训练技巧的系统梳理。</div>
+      <div class="post-card-title">DeepSeek-V4 注意力机制深度解析</div>
+      <div class="post-card-desc">拆解稀疏注意力、NSA 算子与 MLA 融合，理解长上下文低开销背后的工程取舍。</div>
     </div>
     <div class="post-card-meta">
-      <span class="post-card-tag">约 3.2 万字</span>
-      <span>目标检测</span>
+      <span class="post-card-tag">约 0.9 万字</span>
+      <span>LLM 架构</span>
     </div>
   </div>
   </a>
@@ -152,18 +164,6 @@ title: "Davi Liu's AI Blogs"
     <div class="post-card-meta">
       <span class="post-card-tag">约 0.3 万字</span>
       <span>注意力机制</span>
-    </div>
-  </div>
-  </a>
-
-  <a href="blogs/dsv4_att" style="text-decoration:none; color:inherit;">
-  <div class="post-card">    <div class="post-card-body">
-      <div class="post-card-title">DeepSeek-V4 注意力机制深度解析</div>
-      <div class="post-card-desc">拆解稀疏注意力、NSA 算子与 MLA 融合，理解长上下文低开销背后的工程取舍。</div>
-    </div>
-    <div class="post-card-meta">
-      <span class="post-card-tag">约 0.9 万字</span>
-      <span>LLM 架构</span>
     </div>
   </div>
   </a>
