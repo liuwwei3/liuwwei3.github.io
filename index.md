@@ -97,10 +97,10 @@ title: "Davi Liu's AI Blogs"
   <div class="post-card">
     <div class="post-card-body">
       <div class="post-card-title">机器学习快速入门——数学部分</div>
-      <div class="post-card-desc">线性代数、概率论、微积分与优化理论的 ML 核心数学速览，从向量矩阵推进到反向传播与梯度下降。</div>
+      <div class="post-card-desc">线性代数、概率论、微积分与优化理论的 ML 核心数学速览，从向量矩阵推进到反向传播与梯度下降，并以身高体重预测为例串起「概率分布 ↔ 神经网络」的完整对应。</div>
     </div>
     <div class="post-card-meta">
-      <span class="post-card-tag">约 1.6 万字</span>
+      <span class="post-card-tag">约 1.8 万字</span>
       <span>基础入门</span>
     </div>
   </div>
