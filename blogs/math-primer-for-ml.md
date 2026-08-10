@@ -774,7 +774,7 @@ $$\mathbf{W} \approx \mathbf{U}_r \boldsymbol{\Sigma}_r \mathbf{V}_r^T$$
 - **ODE / SDE** — 扩散模型理论、Flow Matching。常见记号：$\frac{d\mathbf{x}}{dt}$, $d\mathbf{x}= \dots dt + \dots dW$
 - **贝叶斯公式** — 变分推断、后验推导。常见记号：$P(A\mid B) \propto P(B\mid A)P(A)$
 - **SVD / 低秩** — LoRA 微调、MLA 高效注意力。常见记号：$\mathbf{W} = \mathbf{U}\boldsymbol{\Sigma}\mathbf{V}^T$
-- **最大似然 / 负对数似然** — 概率分布与神经网络之间的桥梁（第 9 章）。常见记号：$\mathcal{L}(\theta)$, $\text{NLL}$, $\arg\max$
+- **最大似然 / 负对数似然** — 概率分布与神经网络之间的桥梁（第 9 章）。常见记号：$J(\theta)$, $\text{NLL}$, $\arg\max$
 
 ---
 
@@ -817,17 +817,17 @@ $$p_\theta(y \mid x) = \mathcal{N}\!\left(y \;\middle|\; \mu_\theta(x),\; \sigma
 
 把所有数据点的似然乘起来，得到**整个数据集的似然**：
 
-$$\mathcal{L}(\theta) = \prod_{i=1}^{14} p_\theta(y_i \mid x_i) = \prod_{i=1}^{14} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\!\left(-\frac{(y_i - f_\theta(x_i))^2}{2\sigma^2}\right)$$
+$$J(\theta) = \prod_{i=1}^{14} p_\theta(y_i \mid x_i) = \prod_{i=1}^{14} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\!\left(-\frac{(y_i - f_\theta(x_i))^2}{2\sigma^2}\right)$$
 
-**最大似然估计（MLE）**：找到使 $\mathcal{L}(\theta)$ 最大的 $\theta^*$：
+**最大似然估计（MLE）**：找到使 $J(\theta)$ 最大的 $\theta^*$：
 
-$$\theta^* = \arg\max_{\theta}\; \mathcal{L}(\theta)$$
+$$\theta^* = \arg\max_{\theta}\; J(\theta)$$
 
 相乘的式子很难优化，但有一个常用的技巧——**取对数**：对数把连乘变成连加，且不改变最大值的位置（因为 $\log$ 是单调递增的）。最大化对数似然 = 最小化负对数似然：
 
 $$\begin{aligned}
-\theta^* &= \arg\max_{\theta}\; \log \mathcal{L}(\theta) \\
-&= \arg\min_{\theta}\; \underbrace{-\log \mathcal{L}(\theta)}_{\text{负对数似然 NLL}} \\
+\theta^* &= \arg\max_{\theta}\; \log J(\theta) \\
+&= \arg\min_{\theta}\; \underbrace{-\log J(\theta)}_{\text{负对数似然 NLL}} \\
 &= \arg\min_{\theta}\; \sum_{i=1}^{14} \left[\underbrace{\frac{(y_i - f_\theta(x_i))^2}{2\sigma^2}}_{\text{第1项：数据拟合}} + \underbrace{\log(\sqrt{2\pi\sigma^2})}_{\text{第2项：常数}} \right]
 \end{aligned}$$
 
@@ -853,7 +853,7 @@ $$\begin{aligned}
 
 1. **神经网络提供分布的参数**。网络 $f_\theta$ 的输出被解释为概率分布的均值 $\mu$（分类问题中，softmax 输出被解释为多项式分布的参数）。**网络 = 概率分布的参数化。**
 
-2. **概率分布定义损失**。我们写出数据的似然（或对数似然），取负号，就得到损失函数 $\mathcal{L}(\theta) = -\log \prod_i p_\theta(y_i | x_i)$。**分布决定「什么是对的」。**
+2. **概率分布定义损失**。我们写出数据的似然（或对数似然），取负号，就得到损失函数 $\mathcal{L}(\theta) = -\log J(\theta)$。**分布决定「什么是对的」。**
 
 3. **梯度下降优化分布**。损失 $\mathcal{L}(\theta)$ 对参数 $\theta$ 求梯度，沿着负梯度方向更新 $\theta$，让输出的分布越来越贴合数据。**梯度下降就是「让分布变好的过程」。**
 
@@ -862,31 +862,6 @@ $$\begin{aligned}
 ![神经网络的训练：概率分布的参数随梯度下降不断调整](figures/mle_loss_curve.png)
 
 > **看图要点：** 左图——训练曲线：从初始参数 $a=0.35$（绿色圆点）出发，沿负梯度方向 14 步，损失（负对数似然）单调下降，收敛到 $a^* \approx 0.5$（红色星号）。中图——训练前后对比：初始直线（红）严重偏离数据，训练后的直线（绿）贴合数据。右图——训练完成后，模型对不同的身高 $x$（160/170/180cm）输出**三个不同的高斯分布**，峰值分别在 60/65/70kg——每个新输入都得到一个「带不确定性的预测」。
-
-### 9.5 一张表看懂概率分布与神经网络的对应关系
-
-| 概率论概念 | 神经网络中的角色 | 对应关系 |
-|-----------|----------------|---------|
-| 概率分布 $p_\theta(y\|x)$ | 模型的输出解释 | 网络把输入映射到分布参数 |
-| 高斯分布的均值 $\mu$ | 网络的预测值 $f_\theta(x)$ | 回归：最可能的输出 |
-| 高斯分布的方差 $\sigma^2$ | 网络的「不确定度」输出 | 告诉用户预测有多可信 |
-| 多项式分布（softmax） | 分类网络的输出 | 每个类别一个概率 |
-| 似然 $\mathcal{L}(\theta)$ | 模型的「解释力」 | 参数下观测数据的可能性 |
-| 负对数似然 $-\log\mathcal{L}$ | 损失函数 | 目标：让观测数据最可能 |
-| KL 散度 | 训练目标（生成/RL 任务） | 让模型分布贴近真实分布 |
-| 最大似然估计 | 训练的数学目标 | 梯度下降最小化 NLL 的别名 |
-| 贝叶斯后验 | 贝叶斯神经网络 | 分布参数本身的分布 |
-
-### 9.6 一以贯之的视角
-
-如果你回头看整个系列，会发现这一章其实是在**复习**：
-
-- 第 4 章的高斯分布、期望 → 现在它们成了模型的「输出格式」和损失函数的原料
-- 第 5 章的梯度下降 → 现在它有了明确的目标：把似然（或与之等价的损失）压到最小
-- 第 2 章的 softmax → 分类问题里它就是「多项分布」的参数化，交叉熵损失就是它的负对数似然
-- 第 6 章的贝叶斯公式 → 生成模型（VAE、扩散模型）里的 ELBO 本质就是「最大化似然」的变分版本
-
-所以当你以后读到「损失函数」「最大似然」「交叉熵」「NLL」这些词时，请记住它们其实是同一个故事的不同章节：**定义一个概率分布 → 写出数据在这个分布下的似然 → 用梯度下降把似然压到最大。** 神经网络只是这个流程中「负责输出分布参数」的那台可微的机器。
 
 ---
 
