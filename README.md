@@ -4,6 +4,7 @@
 
 ## 文章目录
 
+- [功能性超声神经成像揭示顶内沟外侧区（LIP）扫视的介观组织](blogs/fusi-mesoscopic-lip)（约 2.4 万字）
 - [使用功能性超声的移动式人脑成像](blogs/fusi-mobile-human)（约 1.9 万字）
 - [机器学习快速入门——数学部分](blogs/math-primer-for-ml)（约 1.8 万字）
 - [强化学习：从贝尔曼方程到人类偏好对齐](blogs/RL-Tutorial)（约 3.4 万字）
