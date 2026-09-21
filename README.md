@@ -4,6 +4,7 @@
 
 ## 文章目录
 
+- [用闭环超声脑机接口解码运动计划](blogs/fusi-closed-loop-bci)（约 2.2 万字）
 - [经声透明颅窗对人脑活动进行功能性超声成像](blogs/fusi-human-cranial-window)（约 1.5 万字）
 - [功能性超声神经成像揭示顶内沟外侧区（LIP）扫视的介观组织](blogs/fusi-mesoscopic-lip)（约 2.4 万字）
 - [使用功能性超声的移动式人脑成像](blogs/fusi-mobile-human)（约 1.9 万字）
