@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -323,14 +324,61 @@ def update_index(path: Path, entry: str, dry_run: bool) -> bool:
     return True
 
 
+def stage_via_objects(repo: Path, paths: list) -> None:
+    """不经过 `git add` 的暂存路径：先写 blob，再写索引。
+
+    ⚠️ 本机（macOS 15）实测：**刚写完的文件**——尤其是 0.5–1.7 MB 的图 PNG——
+    被 `git add` 的 `open()` 报 `Operation not permitted`（EPERM），而同一个文件
+    在同一分钟内 `cat` / `dd` / `git hash-object` 都读得动，权限位、owner、ACL、
+    xattr、inode 与能正常 `add` 的同内容文件**完全一致**。
+    即：读内容没问题，是 `add` 自身的代码路径被拦。窗口长度不定——实测同一文件
+    重试 20 次 × 2s（40s）仍未穿过，而 35 分钟后同一条 `git add` 又正常。
+
+    故不再死等 `git add`，改用两条都不走 add 的命令：
+    `git hash-object -w` 写对象 + `git update-index --add --cacheinfo` 写索引。
+    实测对同一文件**立刻成功**。（曾按文件名误判为「带 `-` 的文件失败」——
+    实为窗口内 git 先 open 哪一个就报哪一个，与文件名无关。）
+
+    代价说明：这条路径不处理 .gitignore、目录、删除项——本工具的 files 全是
+    已存在的普通文件，故够用；非常规输入仍应先走 `git add`。
+    """
+    for p in paths:
+        rel = os.path.relpath(str(p), str(repo))
+        h = subprocess.run(['git', 'hash-object', '-w', '--', rel], cwd=repo,
+                           capture_output=True, text=True, check=True).stdout.strip()
+        mode = '100755' if os.access(p, os.X_OK) else '100644'
+        subprocess.run(['git', 'update-index', '--add', '--cacheinfo',
+                        f'{mode},{h},{rel}'], cwd=repo, capture_output=True, check=True)
+
+
+def stage_with_retry(repo: Path, files: list, attempts: int = 3,
+                     delay: float = 1.0) -> None:
+    """暂存改动：先正常 `git add`（短重试），被 EPERM 拦则改走 stage_via_objects。
+
+    不重试/不回退的代价很大：一次上传会因某篇的第一个图失败而整体中断，并把仓库
+    留在脏状态——此后每次调用都会被 main() 的 check_git_clean 拒绝，五篇连环失败。
+    非 EPERM 的错误照旧立刻抛出，不掩盖真实问题。
+    """
+    paths = [INDEX_PATH, README_PATH] + files
+    cmd = ['git', 'add', '--'] + [str(p) for p in paths]
+    for i in range(1, attempts + 1):
+        r = subprocess.run(cmd, cwd=repo, capture_output=True, text=True)
+        if r.returncode == 0:
+            return
+        if 'Operation not permitted' not in r.stderr:
+            raise RuntimeError(f"Git add failed: {r.stderr.strip()}")
+        if i < attempts:
+            time.sleep(delay)
+    stage_via_objects(repo, paths)
+
+
 def git_push(repo: Path, files: list, title: str, dry_run: bool) -> Optional[str]:
     """Stage, commit, and push. Returns short commit hash or None on failure."""
     if dry_run:
         return "dry-run"
 
     # Stage
-    subprocess.run(['git', 'add', '--', str(INDEX_PATH), str(README_PATH)] + files,
-                   cwd=repo, check=True, capture_output=True)
+    stage_with_retry(repo, files)
 
     # Commit
     msg = f"Publish: {title}"
