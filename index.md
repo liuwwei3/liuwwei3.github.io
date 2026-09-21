@@ -92,6 +92,78 @@ title: "Davi Liu's AI Blogs"
 ## 文章目录
 
 <div class="post-list">
+  <a href="blogs/fusi-primate-propagation" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">功能性超声成像揭示清醒灵长类中任务相关脑活动的传播</div>
+      <div class="post-card-desc">清醒猕猴任务态 fUS 脑成像，首次捕捉到任务相关活动的跨区域传播，是「读」通路的可行性起点。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 1.2 万字</span>
+      <span>脑机接口</span>
+    </div>
+  </div>
+  </a>
+  <a href="blogs/fusi-single-trial-decoding" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">用功能性超声神经成像进行运动意图的单试次解码</div>
+      <div class="post-card-desc">从延迟期的 fUS 信号单试次解出运动方向与效应器，fUS 由此从「成像」跨入「在线解码」。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 2.0 万字</span>
+      <span>脑机接口</span>
+    </div>
+  </div>
+  </a>
+  <a href="blogs/fusi-closed-loop-bci" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">用闭环超声脑机接口解码运动计划</div>
+      <div class="post-card-desc">首例闭环超声脑机接口：解码结果实时回灌去驱动任务，「读—解码—写回行为」端到端打通。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 2.2 万字</span>
+      <span>脑机接口</span>
+    </div>
+  </div>
+  </a>
+  <a href="blogs/fusi-human-cranial-window" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">经声透明颅窗对人脑活动进行功能性超声成像</div>
+      <div class="post-card-desc">首例人脑 fUS 功能成像，用植入式声透明颅窗绕过颅骨这一最大瓶颈，人体侧由此破题。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 1.5 万字</span>
+      <span>脑机接口</span>
+    </div>
+  </div>
+  </a>
+  <a href="blogs/fusi-mesoscopic-lip" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">功能性超声神经成像揭示顶内沟外侧区（LIP）扫视的介观组织</div>
+      <div class="post-card-desc">介观分辨率的 fUS 读出 LIP 扫视方向图谱的拓扑组织，且解码器可稳定数月到数年。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 2.4 万字</span>
+      <span>脑机接口</span>
+    </div>
+  </div>
+  </a>
+  <a href="blogs/fusi-mobile-human" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">使用功能性超声的移动式人脑成像</div>
+      <div class="post-card-desc">把 fUS 做成可穿戴形态，在被测者移动中完成人脑成像，朝向真实场景的脑机接口。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 1.9 万字</span>
+      <span>脑机接口</span>
+    </div>
+  </div>
+  </a>
 
   <a href="blogs/math-primer-for-ml" style="text-decoration:none; color:inherit;">
   <div class="post-card">
