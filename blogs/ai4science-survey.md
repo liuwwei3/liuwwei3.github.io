@@ -1160,7 +1160,7 @@ Duede 补上另一半，并给出一个很有用的二分。他用两个案例�
 
 Creel 则提供了节制的立场，防止把"不可解释"当万能挡箭牌。她把透明度拆成算法、结构、运行时三个粒度，主张科学中要求的是"能回答特定问题的**有向透明度**"，而非全盘可解释。Roscher 等把哲学讨论落到方法层：特征归因、物理量提取等，并指出"为预测而解释"与"为科学洞见而解释"是两类不同目标——这是本节面向 ML 读者的技术底座。
 
-本节悬着的那个问题是：**AlphaFold 类系统（2 亿+ 结构多为未经实验验证的预测）是否构成"科学知识"？** 已有专门的哲学讨论（"The Epistemology of AI-driven Science: The Case of AlphaFold"，philsci-archive 预印本〔未核实发表信息〕），其核心是把选项摆成一个三难：AI 产生知识 / 预测不构成知识除非可推自既有原理 / 科学知识不能强不透明——三者必弃其一。这个三难没有标准答案，但它精确地说明了 §6.3 的处境：我们缺的不是更强的模型，而是**判定"这算不算知识"的标准**。
+本节悬着的那个问题是：**AlphaFold 类系统（2 亿+ 结构多为未经实验验证的预测）是否构成"科学知识"？** 已有专门的哲学讨论（Daria Zakharova, *The Epistemology of AI-driven Science: The Case of AlphaFold*；**无期刊发表版本**——截至 2026-10，Crossref / OpenAlex / Semantic Scholar 三个书目库均无该标题记录，其正式载体是作者的 LSE 博士论文 *Cognitive "black boxes": a philosophical examination of non-human minds and AI-driven science*（2026，DOI 10.21953/researchonline.lse.ac.uk.00140240）的第四章，可公开读到的是 philsci-archive 预印本 26659），其核心是把选项摆成一个三难：AI 产生知识 / 预测不构成知识除非可推自既有原理 / 科学知识不能强不透明——三者必弃其一。这个三难没有标准答案，但它精确地说明了 §6.3 的处境：我们缺的不是更强的模型，而是**判定"这算不算知识"的标准**。
 
 ### 6.4 实证：AI 到底有没有加速科学？
 
@@ -1194,7 +1194,7 @@ graph TB
 
 先说结构。Besiroglu 等用数据描述工业界与学术界的算力鸿沟：学术独作团队在算力密集型方向（尤其基础模型）的占比持续下降，学术研究转而依赖工业界的开源与预训练模型；他们建议以国家级算力基础设施 + 结构化访问 + 第三方审计来恢复学术界的批判性角色。其前身 Ahmed & Wahed（17.1 万篇论文、57 个会议）给出更早的一组刻度：精英大学在每个 AI 会议多 **40 篇/年**，Fortune 500 科技公司多 **44 篇/年**，排名 300 名以后的大学少 **6 篇**。当"谁能训得起、谁只能调 API"决定了"谁能做批判"，评测危机就不只是技术问题。
 
-政策三方在补位，但补的方式差别很大。美国是"试点 + 自愿立法"：NAIRR Pilot 2024-01 启动，已有 150+ 资源资助、14 个联邦机构与 28 家私营伙伴；2025-09-02 NSF 发布 **3500 万美元**的 NAIRR Operations Center 招标。立法侧 CREATE AI Act（H.R. 2385）2025-03-26 重新提出，拟在 NSF 内永久确立 NAIRR，**但未规定授权拨款额度**，2026-06-25 以 29–0 通过委员会修正稿——在 NSF 预算收缩背景下，这意味着它仍依赖私营算力捐赠。欧盟走另一条路，把 AI4S 写进超算政策：AI Factories 隶属 EuroHPC JU，2025-10 扩至 **19 个**（16 个成员国），第三批联合投资 **>5 亿欧元**，累计 **>26 亿欧元**；核心机制是虚拟研究所 RAISE，**1.08 亿欧元**试点于 2025-11 在哥本哈根启动；Horizon Europe 为科学家与初创提供最多 **6 亿欧元**的专项访问〔以上欧盟金额来自欧委会页面与二手报道，**未核实**，引用前建议向欧委会页面复核一次〕。中国则是"中央定范式 + 地方出专项"：2025-08 国务院《关于深入实施"人工智能+"行动的意见》把"AI+科学技术"列为六大重点行动之首；北京 2025-07 发布全国首个地方 AI4S 专项计划，2027 年目标含不少于 **10 个**高质量科学数据库、服务不少于 **1000 万用户**、不少于 **5 个**领域深度应用、**8 个以上**标杆案例。
+政策三方在补位，但补的方式差别很大。美国是"试点 + 自愿立法"：NAIRR Pilot 2024-01 启动，已有 150+ 资源资助、14 个联邦机构与 28 家私营伙伴；2025-09-02 NSF 发布 **3500 万美元**的 NAIRR Operations Center 招标。立法侧 CREATE AI Act（H.R. 2385）2025-03-26 重新提出，拟在 NSF 内永久确立 NAIRR，**但未规定授权拨款额度**，2026-06-25 以 29–0 通过委员会修正稿——在 NSF 预算收缩背景下，这意味着它仍依赖私营算力捐赠。欧盟走另一条路，把 AI4S 写进超算政策：AI Factories 隶属 EuroHPC JU，2025-10-10 扩至 **19 个**（16 个成员国），第三批联合投资 **>5 亿欧元**，EU 与参与国累计**承诺** **>26 亿欧元**（口径涵盖 AI Factories 与 Antennas，是"承诺"而非"已拨付"）；核心机制是虚拟研究所 RAISE，**1.07 亿欧元**试点于 2025-11-03 在哥本哈根（欧洲 AI in Science 峰会）启动；同一框架下 Horizon Europe 出资 **6 亿欧元**，为研究者与初创提供 AI Gigafactories 的专用机时访问〔以上已回欧委会与 EuroHPC JU 官方新闻稿逐条核对（2025-10-10、2025-11-03 两份）：19 个 / >5 亿 / >26 亿 / RAISE 1.07 亿 / 6 亿均吻合。原稿两处订正：**1.08 亿应作 1.07 亿欧元**；"最多 6 亿欧元"的"最多"无出处，官方原文为 "€600 million"，且限定用于 Gigafactories 机时〕。中国则是"中央定范式 + 地方出专项"：2025-08 国务院《关于深入实施"人工智能+"行动的意见》把"AI+科学技术"列为六大重点行动之首；北京 2025-07 发布全国首个地方 AI4S 专项计划，2027 年目标含不少于 **10 个**高质量科学数据库、服务不少于 **1000 万用户**、不少于 **5 个**领域深度应用、**8 个以上**标杆案例。
 
 三方政策承诺的指标是**数量与用户数**——数据库个数、用户数、案例数、算力额度——而 §6.1 与 §6.2 提出的问题是**数据质量与评测标准**。这是一个明确的错位：自上而下的数据平台建设能否解决泄漏与饱和，目前没有任何一方把它列成审计项。
 
@@ -1398,7 +1398,7 @@ AI for Science 在过去十年走过的，不是一条能力上升的曲线，�
 119. Roscher, R., Bohn, B., Duarte, M. F. 等 (2020). *Explainable Machine Learning for Scientific Insights and Discoveries.* IEEE Access 8, 42200–42216. DOI 10.1109/access.2020.2976199
 120. Sullivan, E. (2022). *Understanding from Machine Learning Models.* The British Journal for the Philosophy of Science 73(1), 109–133. DOI 10.1093/bjps/axz035
 121. Dean, W. & Naibo, A. (2025). *Artificial Intelligence and Inherent Mathematical Difficulty.* Philosophia Mathematica 33(3), 283–329. [arXiv:2408.03345]
-122. *The Epistemology of AI-driven Science: The Case of AlphaFold.* philsci-archive.pitt.edu/26659〔预印本·未核实发表信息〕
+122. Zakharova, D. (2026). *Cognitive "black boxes": a philosophical examination of non-human minds and AI-driven science* [博士论文]. London School of Economics and Political Science. DOI 10.21953/researchonline.lse.ac.uk.00140240（"The Epistemology of AI-driven Science: The Case of AlphaFold" 为其第四章；正文可公开读到的是 philsci-archive.pitt.edu/26659 预印本。截至 2026-10，Crossref / OpenAlex / Semantic Scholar 均无该标题的期刊记录）
 
 
 [← 回到首页](..)
