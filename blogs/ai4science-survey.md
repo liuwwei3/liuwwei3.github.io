@@ -232,7 +232,9 @@ AI for Science 通常被称作"第五范式"。这个说法值得怀疑。它更
 
 **这个坐标系是本文的公共接口，不是本文的结论。** 它的价值在于：所有讨论 AI for Science 的人都在用这套术语，因此批判只有定位到它说的哪一维、漏了哪一维，才是可对话的。
 
-> **一处存疑，写作时保留。** 这份材料对上述综述的记载自相矛盾：一处说它的横切挑战清单包含"评测"，另一处说它"没有把评测危机列为挑战"。两者不能同真。本文不把"该综述漏掉了评测危机"用作论据；§6 要对比的是**把 evaluation 当作一个话题**与**识别出泄漏/不可复现这一结构性危机**（后者以 Kapoor & Narayanan 的 8 类泄漏分类法为代表）之间的差别。此处待回原文核。
+> **一处已回原文核实的细节，值得留在正文里。** 写作期的二手材料对这份综述的记载自相矛盾：一处说它的挑战清单包含"评测"，另一处说不含。回原文核对后结论是**不含**——该综述的 "Grand challenges" 只分三类（Practical considerations / Advancing AI algorithms / Scientific enterprise），evaluation 不在其中。矛盾的来源也找到了：文中确有一节标题带 evaluation，叫 **“Efficient evaluation of scientific hypotheses”**，但它属于"AI 辅助实验与仿真"那一章，讲的是**用 AI 设计实验去检验科学假说**——是"评测假说"，不是"评测 AI 模型"。**同一个词的两层意思，恰好就是 §6 要区分的那件事**：把 evaluation 当作一个话题，与识别出泄漏和不可复现已构成结构性危机，是两回事。
+>
+> 〔核实口径：可公开获取的是作者接受稿全文（MIT DSpace 绿色 OA）与付费版免费摘要，二者在"挑战清单不含评测"上一致；付费排版版正文未能直接读到。〕
 
 ### 1.2 科学问题对机器友好的共同结构
 
@@ -684,7 +686,7 @@ ESM-2 / ESMFold 的答案是能。把蛋白质语言模型扩到 **150 亿参数
 
 **Enformer**（2021）是这一支的奠基工作。它用注意力把感受野从不到 **20 kb** 拉到约 **200 kb**（有效远端作用至 **100 kb**），直接从 DNA 序列预测基因表达与多种调控 track，并能直接输出增强子—启动子互作。它定义了这一支的任务格式：多 track 回归加变异效应打分。
 
-它的直接继承者是 **AlphaGenome**（2025）：输入 **1 Mb** 序列，一次前向同时输出 **5,930** 条人类 track、**11 种模态**（表达、剪接位点与剪接连接、染色质状态、3D 接触图），**约 1 秒内完成一个变异的全模态打分**，在 **22/24** 项 track 预测与 **25/26** 项变异效应评测中达到或超过专用模型（SpliceAI、ChromBPNet、Borzoi）。
+它的直接继承者是 **AlphaGenome**（2026）：输入 **1 Mb** 序列，一次前向同时输出 **5,930** 条人类 track、**11 种模态**（表达、剪接位点与剪接连接、染色质状态、3D 接触图），**约 1 秒内完成一个变异的全模态打分**，在 **22/24** 项 track 预测与 **25/26** 项变异效应评测中达到或超过专用模型（SpliceAI、ChromBPNet、Borzoi）。
 
 **AlphaMissense**（2023）是同一支血脉的另一次外溢，而且它示范了一条通用打法。它以 AlphaFold 为骨架，在人类与灵长类的**群体频率数据**上微调，为人类蛋白质组**全部可能的单氨基酸替换**（约 **7,100 万**个）给出致病性分数，其中 **89%** 被判为 likely benign 或 likely pathogenic。关键在于它不依赖临床标注——**用群体数据做弱标签**。这是结构模型外溢到临床遗传学最成功的一次，也是 AF 谱系从「解结构」走向「解功能后果」的转折点。
 
@@ -1058,19 +1060,19 @@ Kosmos 作者自己写下了本章论点最直白的一句自我限定：**"ther
 ```mermaid
 quadrantChart
     title 图 4 可形式化程度 × 验证成本
-    x-axis 可形式化程度 低 --> 高
-    y-axis 验证成本 低 --> 高
-    quadrant-1 无
-    quadrant-2 假阳性区
-    quadrant-3 宣称区
-    quadrant-4 闭环区
-    材料化学: [0.12, 0.88]
-    数学: [0.93, 0.12]
-    Agent可判定半: [0.72, 0.28]
-    Agent不可判定半: [0.25, 0.35]
+    x-axis "可形式化 低" --> "可形式化 高"
+    y-axis "验证成本 低" --> "验证成本 高"
+    quadrant-1 "无"
+    quadrant-2 "假阳性区"
+    quadrant-3 "宣称区"
+    quadrant-4 "闭环区"
+    "材料化学": [0.12, 0.88]
+    "数学": [0.93, 0.12]
+    "Agent可判定半": [0.72, 0.28]
+    "Agent不可判定半": [0.25, 0.35]
 ```
 
-> **图 4**. 可形式化程度 × 验证成本。数学在右下（可形式化、成本低），材料与化学在左上（不可形式化、成本高），科研 agent 横跨两象限：可判定的一半靠右下，不可判定的一半靠左上。**可校准性**是这条平面之外的一个标注——它标记的不是某个领域，而是一种状态：连"可靠性是多少"都测不出来（§5.4 的影子评估）。
+> **图 4**. 可形式化程度 × 验证成本。数学在右下（可形式化、成本低），材料与化学在左上（不可形式化、成本高），科研 agent 横跨两象限：可判定的一半在右下（可形式化、验证便宜，与数学同格），不可判定的一半在左下（不可形式化、验证同样便宜——便宜到根本不构成验证，因而成为宣称最多的一格）。**可校准性**是这条平面之外的一个标注——它标记的不是某个领域，而是一种状态：连"可靠性是多少"都测不出来（§5.4 的影子评估）。
 
 把两个因子与结果并排，就是本章的总结表：
 
@@ -1116,7 +1118,7 @@ Kedzierska 等（Microsoft Research）的靶子就打在它旁边。他们在**�
 
 请注意这里的归因方向。Kedzierska 等给出的解释不是"数据还不够多"，而是"架构或预训练目标没匹配上域结构"。这句话把问题从**量**改写成**结构**——两篇的结论因此无法用"再等等、数据再大点"来调和；它们不矛盾的一种可能是，标度律是否成立取决于架构与预训练目标是否匹配域结构，但**这一解释尚未被直接实验检验**。同一根轴上还有第三种读数：Kendiukhov（arXiv:2602.15253, 2026）报告在 20 万细胞时出现幂律、在 1 万细胞时标度律崩塌，并明确写出"数据稀缺而非模型容量是约束"。
 
-路线层还有一场同刊对台。Gomes 在 *Daedalus* 2026 冬季"AI 与科学"专号上主张，AI for Science 的正路不是把 GPT 配方照搬到科学，而是围绕"知识表示—约束—推理"重构发现流程〔该文 DOI 形态异于常见 MIT Press 格式，待核〕。同一专号的 Orvieto 则质疑基因组学里的 AI 系统是否真称得上"基础"架构，指出十年前的老式监督学习在极低算力下仍有性能优势〔同待核〕。一正一反、同期同刊——这是写"争议"最省力、也最诚实的一对引文。
+路线层还有一场同刊对台。Gomes 在 *Daedalus* 2026 冬季"AI 与科学"专号上主张，AI for Science 的正路不是把 GPT 配方照搬到科学，而是围绕"知识表示—约束—推理"重构发现流程。同一专号的 Orvieto 则质疑基因组学里的 AI 系统是否真称得上"基础"架构，指出十年前的老式监督学习在极低算力下仍有性能优势。一正一反、同期同刊——这是写"争议"最省力、也最诚实的一对引文。
 
 所以"科学数据够不够"不是一个能一次问清的量。它取决于你的模型与这个域的结构是否匹配，而这是一个至今没有被直接测量的调节变量。
 
@@ -1142,7 +1144,7 @@ Kedzierska 等（Microsoft Research）的靶子就打在它旁边。他们在**�
 
 制度侧还有一个提案。Gebru 等的 Datasheets for Datasets 要求每个数据集附上动机、构成、采集、预处理/标注、用途、分发、维护七组文档；它常被批评为自愿、非强制，不足以约束基准作者——这正好解释了为什么十年后泄漏仍然是基础设施属性而非个例。
 
-这里要回收 §1 埋下的伏笔，但要比原设想收得更小心。那篇 *Nature* 620 的路线图综述（26 位作者，含 Bengio 与 Zitnik）**是否**把"评测"列进了横切挑战，材料自身记载矛盾〔板块 06 同一条目的「一句话」说挑战清单含"评测"，「为什么重要」却说不含；该文无本地 PDF，无法在写作期裁定，待核〕。但无论它写没写，真正的分别不在"提没提 evaluation"，而在**把 evaluation 列为一个话题，与识别出泄漏和不可复现已构成结构性危机，是两件事**。前者是给读者的目录式交代；后者需要 Kapoor 那样的分类学，需要 17 个学科 329 篇的失败清单。到 2026 年，那些做不对的泄漏过滤、那些会翻转的榜单、那些一加噪声就崩的分数，都已经有了定量证据。所以这一段的刀口不在"他们漏了评测"，而在"评测这个话题下真正要紧的那一项，是分类学与强制标准，而不是目录条目"。
+这里要回收 §1 埋下的伏笔，但要比原设想收得更小心。那篇 *Nature* 620 的路线图综述（26 位作者，含 Bengio 与 Zitnik）**没有**把"评测"列进它的挑战清单——已回原文核：其 "Grand challenges" 只分三类（Practical considerations / Advancing AI algorithms / Scientific enterprise），evaluation 不在其中〔核实口径见 §1.1〕。但这个"没有"极容易被误读成"他们漏了评测"，而误读的成因本身就有意思：该文确有一节叫 **“Efficient evaluation of scientific hypotheses”**，讲的是用 AI 设计实验去检验科学假说。**同一个 evaluation，在他们那里指科学假说，在我们这里指 AI 模型。** 真正的分别不在"提没提 evaluation"，而在**把 evaluation 列为一个话题，与识别出泄漏和不可复现已构成结构性危机，是两件事**。前者是给读者的目录式交代；后者需要 Kapoor 那样的分类学，需要 17 个学科 329 篇的失败清单。到 2026 年，那些做不对的泄漏过滤、那些会翻转的榜单、那些一加噪声就崩的分数，都已经有了定量证据。所以这一段的刀口不在"他们漏了评测"，而在"评测这个话题下真正要紧的那一项，是分类学与强制标准，而不是目录条目"。
 
 评测还有一个更尴尬的对象：AI 自己。当被评测者是一台科研机器，评测者往往也是模型——"谁给 AI 的论文打分"因此是整条路线上最大的循环论证风险。§5.4 已经把这一档的证据摆齐（自动评审器与 10 位人类审稿人的校准、影子评估与 MLR-Bench 的相反观察、AI Scientist v2 被 workshop 接收与其独立复核之间的落差），并按"必须成对引用"处理过；此处只记下横切层面的一句方法论纪律：**评测 AI 做科研的器具，本身也是需要被评测的对象**，而 §5.4 的材料显示，这种评测在"可机械核对"的那一层可靠、在"值不值得做"的那一层测不准。这与 §6.3 的问题直接接壤。
 
@@ -1245,11 +1247,11 @@ AI for Science 在过去十年走过的，不是一条能力上升的曲线，�
 1. Wang, H., Fu, T., Du, Y., … Bengio, Y. & Zitnik, M. (2023). *Scientific discovery in the age of artificial intelligence.* Nature 620, 47–60. DOI 10.1038/s41586-023-06221-2
 2. Cheetham, A. K. & Seshadri, R. (2024). *Artificial Intelligence Driving Materials Discovery? Perspective on the Article: Scaling Deep Learning for Materials Discovery.* Chemistry of Materials 36(8), 3490–3495. DOI 10.1021/acs.chemmater.4c00643
 3. Juelsholt, M. (2026). *Continued challenges in high-throughput materials predictions: MatterGen predicts compounds from the training dataset.* Materials Horizons 13, 5672–5679. DOI 10.1039/D6MH00268D
-4. Dobson, L., Tusnády, G. E. & Tompa, P. (2025). （标题未在材料中给出）*Briefings in Bioinformatics* 26(2), bbaf104. DOI 10.1093/bib/bbaf104
-5. Schuh, …; Daniluk, …; Sieber, … (2026). （标题未在材料中给出）*Chemical Science* 17, 17455–17467. DOI 10.1039/d6sc01799a
+4. Dobson, L., Tusnády, G. E. & Tompa, P. (2025). *Regularly updated benchmark sets for statistically correct evaluations of AlphaFold applications.* Briefings in Bioinformatics 26(2), bbaf104. DOI 10.1093/bib/bbaf104
+5. Schuh, M. G., Daniluk, A. & Sieber, S. A. (2026). *Auditing widely used biomolecular benchmarks reveals systematic data inconsistencies.* Chemical Science 17(36), 17455–17467. DOI 10.1039/d6sc01799a
 6. Van Noorden, R. & Perkel, J. M. (2023). *AI and science: what 1,600 researchers think.* Nature 621, 672–675. DOI 10.1038/d41586-023-02980-0
-7. Gomes, C. P. (2026). *Knowledge-Centric AI for Scientific Discovery.* Daedalus 155, 185–201. DOI 10.1162/daed.a.981〔DOI 形态待核〕
-8. Orvieto, A. (2026). *Are Current AI Systems Unlocking Knowledge Discovery in Genomics?* Daedalus 155, 354–357. DOI 10.1162/daed.a.993〔DOI 形态待核〕
+7. Gomes, C. P. (2026). *Knowledge-Centric AI for Scientific Discovery.* Daedalus 155(1–2), 185–201. DOI 10.1162/daed.a.981
+8. Orvieto, A. (2026). *Are Current AI Systems Unlocking Knowledge Discovery in Genomics?* Daedalus 155(1–2), 354–357. DOI 10.1162/daed.a.993
 
 ### 代理层：算子学习与物理约束网络
 
@@ -1306,11 +1308,11 @@ AI for Science 在过去十年走过的，不是一条能力上升的曲线，�
 50. Krishna, R., Wang, J. 等 (2024). *Generalized biomolecular modeling and design with RoseTTAFold All-Atom.* Science 384, eadl2528. DOI 10.1126/science.adl2528
 51. Lin, Z. 等 (2023). *Evolutionary-scale prediction of atomic-level protein structure with a language model.* Science 379, 1123–1130. DOI 10.1126/science.ade2574
 52. Avsec, Ž. 等 (2021). *Effective gene expression prediction from sequence by integrating long-range interactions.* Nature Methods 18, 1196–1203. DOI 10.1038/s41592-021-01252-x
-53. Avsec, Ž. 等 (2025). *AlphaGenome.*（标题未在材料中给出）Nature. DOI 10.1038/s41586-025-10014-0
+53. Avsec, Ž. 等 (2026). *Advancing regulatory variant effect prediction with AlphaGenome.* Nature 649, 1206–1218. DOI 10.1038/s41586-025-10014-0
 54. Cheng, J. 等 (2023). *Accurate proteome-wide missense variant effect prediction with AlphaMissense.* Science 381, eadg7492. DOI 10.1126/science.adg7492
 55. Dalla-Torre, H. 等 (2023). *The Nucleotide Transformer: Building and Evaluating Robust Foundation Models for Human Genomics.* bioRxiv（后正式发表：Nature Methods 2024）. DOI 10.1101/2023.01.11.523679
 56. Nguyen, E. 等 (2024). *Sequence modeling and design from molecular to genome scale with Evo.* Science 386, eado9336. DOI 10.1126/science.ado9336
-57. Brixi, G. 等 (2026). *Evo 2.*（标题未在材料中给出）Nature 652, 1349–1361. [bioRxiv: 10.1101/2025.02.18.638918]
+57. Brixi, G. 等 (2026). *Genome modelling and design across all domains of life with Evo 2.* Nature 652, 1349–1361. [预印本 bioRxiv: 10.1101/2025.02.18.638918，美式拼写 _modeling_]
 58. del Alamo, D., Sala, D., Mchaourab, H. S. & Meiler, J. (2022). *Sampling alternative conformational states of transporters and receptors with AlphaFold2.* eLife 11, e75751. [PMID: 35238773]
 59. Tesei, G. 等 (2024). *Conformational ensembles of the human intrinsically disordered proteome.* Nature 626, 897–904. DOI 10.1038/s41586-023-07004-5
 60. Noé, F. 等 (2025). *Scalable emulation of protein equilibrium ensembles with generative deep learning.* Science. DOI 10.1126/science.adv9817
@@ -1382,7 +1384,7 @@ AI for Science 在过去十年走过的，不是一条能力上升的曲线，�
 108. Gebru, T., Morgenstern, J., Vecchione, B., Vaughan, J. W., Wallach, H., Daumé III, H. & Crawford, K. (2021). *Datasheets for Datasets.* Communications of the ACM 64(12), 86–92. DOI 10.1145/3458723
 109. Kapoor, S. & Narayanan, A. (2023). *Leakage and the reproducibility crisis in machine-learning-based science.* Patterns 4(9), 100804. DOI 10.1016/j.patter.2023.100804
 110. Kedzierska, K. Z., Crawford, L. & Amini, A. P. (2025). *Zero-shot evaluation reveals limitations of single-cell foundation models.* Genome Biology 26. DOI 10.1186/s13059-025-03574-x
-111. Kendiukhov, I. (2026). （标题未在材料中给出）[arXiv:2602.15253]
+111. Kendiukhov, I. (2026). *Scaling Laws for Masked-Reconstruction Transformers on Single-Cell Transcriptomics.* [arXiv:2602.15253]
 112. Kusumegi, K., Yang, X. & Ginsparg, P. (2025). *Scientific production in the era of large language models.* Science 390, 1240–1243. DOI 10.1126/science.adw3000
 113. Mirzadeh, I., Alizadeh, K., Shahrokhi, H., Tuzel, O., Bengio, S. & Farajtabar, M. (2024). *GSM-Symbolic: Understanding the Limitations of Mathematical Reasoning in Large Language Models.* [arXiv:2410.05229]
 114. Renault, T., Bergeaud, A. & Bosquet, C. (2026). *Scientific production in the era of large language models: Outcome-triggered treatment timing and spurious event-study dynamics.* PNAS 123(33), e2618638123. DOI 10.1073/pnas.2618638123
