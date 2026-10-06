@@ -92,6 +92,18 @@ title: "Davi Liu's AI Blogs"
 ## 文章目录
 
 <div class="post-list">
+  <a href="blogs/ai4science-survey" style="text-decoration:none; color:inherit;">
+  <div class="post-card">
+    <div class="post-card-body">
+      <div class="post-card-title">AI for Science：从代理到闭环（2017–2026）</div>
+      <div class="post-card-desc">按代理、反演、生成、闭环四层拆解 AI for Science，逐层追问验证器是否可靠。</div>
+    </div>
+    <div class="post-card-meta">
+      <span class="post-card-tag">约 3.9 万字</span>
+      <span>综述</span>
+    </div>
+  </div>
+  </a>
   <a href="blogs/fusi-primate-propagation" style="text-decoration:none; color:inherit;">
   <div class="post-card">
     <div class="post-card-body">
