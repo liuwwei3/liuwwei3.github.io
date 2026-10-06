@@ -4,6 +4,7 @@
 
 ## 文章目录
 
+- [AI for Science：从代理到闭环（2017–2026）](blogs/ai4science-survey)（约 3.9 万字）
 - [功能性超声成像揭示清醒灵长类中任务相关脑活动的传播](blogs/fusi-primate-propagation)（约 1.2 万字）
 - [用功能性超声神经成像进行运动意图的单试次解码](blogs/fusi-single-trial-decoding)（约 2.0 万字）
 - [用闭环超声脑机接口解码运动计划](blogs/fusi-closed-loop-bci)（约 2.2 万字）
