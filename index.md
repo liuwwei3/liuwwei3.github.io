@@ -99,7 +99,7 @@ title: "Davi Liu's AI Blogs"
       <div class="post-card-desc">按代理、反演、生成、闭环四层拆解 AI for Science，逐层追问验证器是否可靠。</div>
     </div>
     <div class="post-card-meta">
-      <span class="post-card-tag">约 3.9 万字</span>
+      <span class="post-card-tag">约 4.0 万字</span>
       <span>综述</span>
     </div>
   </div>
